@@ -28,6 +28,14 @@
   ],
   "author": "juan294",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/juan294/termplex.git"
+  },
+  "homepage": "https://github.com/juan294/termplex#readme",
+  "bugs": {
+    "url": "https://github.com/juan294/termplex/issues"
+  },
   "files": [
     "dist"
   ],
