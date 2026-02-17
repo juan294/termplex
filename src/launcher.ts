@@ -22,9 +22,9 @@ function splitPane(
   );
 }
 
-function isTmuxInstalled(): boolean {
+function isCommandInstalled(cmd: string): boolean {
   try {
-    execSync("command -v tmux", { stdio: "ignore" });
+    execSync(`command -v ${cmd}`, { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -71,8 +71,73 @@ function prompt(question: string): Promise<string> {
   });
 }
 
+const KNOWN_INSTALL_COMMANDS: Record<string, () => string | null> = {
+  claude: () => "npm install -g @anthropic-ai/claude-code",
+  lazygit: () => {
+    if (process.platform === "darwin") {
+      try {
+        execSync("command -v brew", { stdio: "ignore" });
+        return "brew install lazygit";
+      } catch {
+        return null;
+      }
+    }
+    if (process.platform === "linux") {
+      try {
+        execSync("command -v brew", { stdio: "ignore" });
+        return "brew install lazygit";
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  },
+};
+
+async function ensureCommand(cmd: string): Promise<void> {
+  if (isCommandInstalled(cmd)) return;
+
+  const getInstall = KNOWN_INSTALL_COMMANDS[cmd];
+  const installCmd = getInstall ? getInstall() : null;
+
+  if (!installCmd) {
+    console.error(
+      `\`${cmd}\` is required but not installed, and no known install method was found.`,
+    );
+    console.error(
+      `Please install \`${cmd}\` manually or change your config with: termplex config set editor <command>`,
+    );
+    process.exit(1);
+  }
+
+  console.log(`\`${cmd}\` is required but not installed on this machine.`);
+  const answer = await prompt(`Install it now with \`${installCmd}\`? [Y/n] `);
+
+  if (answer && answer !== "y" && answer !== "yes") {
+    console.log(`\`${cmd}\` is required for this workspace layout. Exiting.`);
+    process.exit(1);
+  }
+
+  console.log(`Running: ${installCmd}`);
+  try {
+    execSync(installCmd, { stdio: "inherit" });
+  } catch {
+    console.error(
+      `Failed to install \`${cmd}\`. Please install it manually and try again.`,
+    );
+    process.exit(1);
+  }
+
+  if (!isCommandInstalled(cmd)) {
+    console.error(`\`${cmd}\` still not found after install. Please check your PATH.`);
+    process.exit(1);
+  }
+
+  console.log(`\`${cmd}\` installed successfully!\n`);
+}
+
 async function ensureTmux(): Promise<void> {
-  if (isTmuxInstalled()) return;
+  if (isCommandInstalled("tmux")) return;
 
   const installCmd = getInstallCommand();
   if (!installCmd) {
@@ -101,7 +166,7 @@ async function ensureTmux(): Promise<void> {
     process.exit(1);
   }
 
-  if (!isTmuxInstalled()) {
+  if (!isCommandInstalled("tmux")) {
     console.error("tmux still not found after install. Please check your PATH.");
     process.exit(1);
   }
@@ -166,6 +231,11 @@ export async function launch(targetDir: string): Promise<void> {
   }
 
   await ensureTmux();
+
+  const editor = getConfig("editor") ?? "claude";
+  const sidebar = getConfig("sidebar") ?? "lazygit";
+  if (editor) await ensureCommand(editor);
+  if (sidebar) await ensureCommand(sidebar);
 
   const dirName = basename(targetDir).replace(/[^a-zA-Z0-9_-]/g, "_");
   const sessionName = `tp-${dirName}`;

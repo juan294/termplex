@@ -16,6 +16,15 @@ vi.mock("node:fs", () => ({
   existsSync: vi.fn(() => true),
 }));
 
+// Mock readline for prompt tests
+const mockQuestion = vi.fn();
+vi.mock("node:readline", () => ({
+  createInterface: () => ({
+    question: (_q: string, cb: (a: string) => void) => mockQuestion(_q, cb),
+    close: vi.fn(),
+  }),
+}));
+
 // Import after mocks are set up
 const { launch } = await import("./launcher.js");
 const { getConfig } = await import("./config.js");
@@ -23,10 +32,10 @@ const { existsSync } = await import("node:fs");
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Default: tmux is installed
-  // Return string for calls with { encoding }, Buffer otherwise
+  // Default: all commands are installed
   mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
-    if (cmd === "command -v tmux") return Buffer.from("/usr/bin/tmux");
+    if (typeof cmd === "string" && cmd.startsWith("command -v "))
+      return Buffer.from("/usr/bin/stub");
     if (opts?.encoding) return "";
     return Buffer.from("");
   });
@@ -48,7 +57,8 @@ describe("tmux detection", () => {
   it("checks for tmux installation", async () => {
     // Simulate existing session — attach succeeds immediately
     mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
-      if (cmd === "command -v tmux") return Buffer.from("/usr/bin/tmux");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
       if (typeof cmd === "string" && cmd.includes("has-session"))
         return opts?.encoding ? "" : Buffer.from("");
       return opts?.encoding ? "" : Buffer.from("");
@@ -64,8 +74,8 @@ describe("tmux detection", () => {
 describe("session name generation", () => {
   it("derives session name from directory basename", async () => {
     mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
-      if (cmd === "command -v tmux") return Buffer.from("/usr/bin/tmux");
-      // No existing session — has-session throws
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
       if (typeof cmd === "string" && cmd.includes("has-session"))
         throw new Error("no session");
       return opts?.encoding ? "%0" : Buffer.from("%0");
@@ -87,7 +97,8 @@ describe("session name generation", () => {
 describe("buildSession", () => {
   it("creates a tmux session with configured panes", async () => {
     mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
-      if (cmd === "command -v tmux") return Buffer.from("/usr/bin/tmux");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
       if (typeof cmd === "string" && cmd.includes("has-session"))
         throw new Error("no session");
       return opts?.encoding ? "%0" : Buffer.from("%0");
@@ -113,7 +124,8 @@ describe("buildSession", () => {
 
   it("reattaches to existing session instead of creating new one", async () => {
     mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
-      if (cmd === "command -v tmux") return Buffer.from("/usr/bin/tmux");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
       // has-session succeeds — session exists
       if (typeof cmd === "string" && cmd.includes("has-session"))
         return opts?.encoding ? "" : Buffer.from("");
@@ -125,5 +137,159 @@ describe("buildSession", () => {
     const tmuxCalls = mockExecSync.mock.calls.map((c) => c[0] as string);
     expect(tmuxCalls.some((c) => c.includes("attach-session"))).toBe(true);
     expect(tmuxCalls.some((c) => c.includes("new-session"))).toBe(false);
+  });
+});
+
+describe("command dependency checks", () => {
+  it("checks editor and sidebar commands before building session", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        return opts?.encoding ? "" : Buffer.from("");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    await launch("/tmp/workspace");
+
+    // Default editor=claude, sidebar=lazygit
+    expect(mockExecSync).toHaveBeenCalledWith("command -v claude", {
+      stdio: "ignore",
+    });
+    expect(mockExecSync).toHaveBeenCalledWith("command -v lazygit", {
+      stdio: "ignore",
+    });
+  });
+
+  it("already-installed commands proceed without prompting", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        return opts?.encoding ? "" : Buffer.from("");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    await launch("/tmp/workspace");
+
+    // prompt (readline.question) should never have been called
+    expect(mockQuestion).not.toHaveBeenCalled();
+  });
+
+  it("offers to install a known missing command (claude)", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (cmd === "command -v claude") throw new Error("not found");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    // User accepts the install prompt
+    mockQuestion.mockImplementation((_q: string, cb: (a: string) => void) => {
+      cb("y");
+    });
+
+    // After install, command -v should succeed on second call
+    let claudeCallCount = 0;
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (cmd === "command -v claude") {
+        claudeCallCount++;
+        if (claudeCallCount <= 1) throw new Error("not found");
+        return Buffer.from("/usr/bin/claude");
+      }
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        return opts?.encoding ? "" : Buffer.from("");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+
+    await launch("/tmp/workspace");
+
+    // Should have prompted and run install
+    expect(mockQuestion).toHaveBeenCalledTimes(1);
+    expect(mockQuestion.mock.calls[0]![0]).toContain(
+      "npm install -g @anthropic-ai/claude-code",
+    );
+    expect(mockExecSync).toHaveBeenCalledWith(
+      "npm install -g @anthropic-ai/claude-code",
+      { stdio: "inherit" },
+    );
+  });
+
+  it("exits when unknown command is missing", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (cmd === "command -v obscure-tool") throw new Error("not found");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockImplementation((key: string) => {
+      if (key === "editor") return "obscure-tool";
+      if (key === "sidebar") return "htop";
+      return undefined;
+    });
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("process.exit");
+    });
+
+    await expect(launch("/tmp/workspace")).rejects.toThrow("process.exit");
+    expect(mockExit).toHaveBeenCalledWith(1);
+    mockExit.mockRestore();
+  });
+
+  it("skips check when editor config is empty string", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        return opts?.encoding ? "" : Buffer.from("");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockImplementation((key: string) => {
+      if (key === "editor") return "";
+      if (key === "sidebar") return "";
+      return undefined;
+    });
+
+    await launch("/tmp/workspace");
+
+    // Should NOT check for empty-string commands
+    const commandChecks = mockExecSync.mock.calls
+      .map((c) => c[0] as string)
+      .filter((c) => c.startsWith("command -v "));
+    // Only tmux should be checked
+    expect(commandChecks).toEqual(["command -v tmux"]);
+  });
+
+  it("exits when user declines install", async () => {
+    let claudeCallCount = 0;
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (cmd === "command -v claude") {
+        claudeCallCount++;
+        throw new Error("not found");
+      }
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    // User declines
+    mockQuestion.mockImplementation((_q: string, cb: (a: string) => void) => {
+      cb("n");
+    });
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("process.exit");
+    });
+
+    await expect(launch("/tmp/workspace")).rejects.toThrow("process.exit");
+    expect(mockExit).toHaveBeenCalledWith(1);
+    mockExit.mockRestore();
   });
 });
