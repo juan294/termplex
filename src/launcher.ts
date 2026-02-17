@@ -179,8 +179,9 @@ function buildSession(sessionName: string, targetDir: string): void {
   const sidebarCommand = getConfig("sidebar") ?? "lazygit";
   const editorPanes = parseInt(getConfig("panes") ?? "3", 10);
   const editorSize = parseInt(getConfig("editor-size") ?? "75", 10);
+  const server = getConfig("server") ?? "true";
 
-  const plan = planLayout({ editor, sidebarCommand, editorPanes, editorSize });
+  const plan = planLayout({ editor, sidebarCommand, editorPanes, editorSize, server });
 
   // Create detached session and capture the root pane ID
   tmux(`new-session -d -s "${sessionName}" -c "${targetDir}"`);
@@ -201,18 +202,19 @@ function buildSession(sessionName: string, targetDir: string): void {
     target = splitPane(target, "v", pct, targetDir, plan.editor || undefined);
   }
 
-  // --- Right column: additional editor panes + 1 server pane ---
-  const totalRight = plan.rightColumnEditorCount + 1;
+  // --- Right column: additional editor panes + optional server pane ---
+  const serverCount = plan.hasServer ? 1 : 0;
+  const totalRight = plan.rightColumnEditorCount + serverCount;
   target = rightColId;
   for (let i = 1; i < totalRight; i++) {
-    const isServer = i === totalRight - 1;
+    const isServer = plan.hasServer && i === totalRight - 1;
     const pct = Math.floor(
       ((totalRight - i) / (totalRight - i + 1)) * 100,
     );
-    target = splitPane(
-      target, "v", pct, targetDir,
-      isServer ? undefined : (plan.editor || undefined),
-    );
+    const cmd = isServer
+      ? (plan.serverCommand ?? undefined)
+      : (plan.editor || undefined);
+    target = splitPane(target, "v", pct, targetDir, cmd);
   }
 
   // Root pane was created with a plain shell — replace it with the editor
@@ -234,8 +236,15 @@ export async function launch(targetDir: string): Promise<void> {
 
   const editor = getConfig("editor") ?? "claude";
   const sidebar = getConfig("sidebar") ?? "lazygit";
+  const server = getConfig("server") ?? "true";
   if (editor) await ensureCommand(editor);
   if (sidebar) await ensureCommand(sidebar);
+
+  // If server is a custom command (not "true"/"false"/""), check the binary
+  if (server && server !== "true" && server !== "false") {
+    const serverBin = server.split(" ")[0]!;
+    await ensureCommand(serverBin);
+  }
 
   const dirName = basename(targetDir).replace(/[^a-zA-Z0-9_-]/g, "_");
   const sessionName = `tp-${dirName}`;

@@ -140,6 +140,67 @@ describe("buildSession", () => {
   });
 });
 
+describe("server pane toggle", () => {
+  it("skips server pane when server=false", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        throw new Error("no session");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    vi.mocked(getConfig).mockImplementation((key: string) => {
+      if (key === "editor") return "vim";
+      if (key === "panes") return "1";
+      if (key === "sidebar") return "lazygit";
+      if (key === "server") return "false";
+      return undefined;
+    });
+
+    await launch("/tmp/workspace");
+
+    // With 1 editor pane and no server: left=1, right=0
+    // Should have: new-session, split for sidebar, split for right col
+    // But right col has 0 editors + 0 server = no vertical splits in right col
+    const tmuxCalls = mockExecSync.mock.calls
+      .map((c) => c[0] as string)
+      .filter((c) => c.startsWith("tmux "));
+
+    // Count split-window calls — should be exactly 2 (sidebar + right col)
+    const splits = tmuxCalls.filter((c) => c.includes("split-window"));
+    expect(splits.length).toBe(2);
+  });
+
+  it("passes custom server command to pane", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        throw new Error("no session");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    vi.mocked(getConfig).mockImplementation((key: string) => {
+      if (key === "editor") return "vim";
+      if (key === "panes") return "2";
+      if (key === "sidebar") return "lazygit";
+      if (key === "server") return "npm run dev";
+      return undefined;
+    });
+
+    await launch("/tmp/workspace");
+
+    const tmuxCalls = mockExecSync.mock.calls
+      .map((c) => c[0] as string)
+      .filter((c) => c.startsWith("tmux "));
+
+    // The server pane should contain the custom command
+    const serverSplit = tmuxCalls.find(
+      (c) => c.includes("split-window") && c.includes("npm run dev"),
+    );
+    expect(serverSplit).toBeDefined();
+  });
+});
+
 describe("command dependency checks", () => {
   it("checks editor and sidebar commands before building session", async () => {
     mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {

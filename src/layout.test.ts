@@ -63,3 +63,35 @@ describe("planLayout", () => {
     expect(plan.editor).toBe("");
   });
 });
+
+describe("server pane toggle", () => {
+  it("defaults to hasServer true with no serverCommand", () => {
+    const plan = planLayout();
+    expect(plan.hasServer).toBe(true);
+    expect(plan.serverCommand).toBeNull();
+  });
+
+  it('server: "true" → plain shell', () => {
+    const plan = planLayout({ server: "true" });
+    expect(plan.hasServer).toBe(true);
+    expect(plan.serverCommand).toBeNull();
+  });
+
+  it('server: "false" → no server', () => {
+    const plan = planLayout({ server: "false" });
+    expect(plan.hasServer).toBe(false);
+    expect(plan.serverCommand).toBeNull();
+  });
+
+  it('server: "" → no server', () => {
+    const plan = planLayout({ server: "" });
+    expect(plan.hasServer).toBe(false);
+    expect(plan.serverCommand).toBeNull();
+  });
+
+  it('server: "npm run dev" → custom command', () => {
+    const plan = planLayout({ server: "npm run dev" });
+    expect(plan.hasServer).toBe(true);
+    expect(plan.serverCommand).toBe("npm run dev");
+  });
+});
