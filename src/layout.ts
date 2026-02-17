@@ -35,6 +35,22 @@ function parseServer(value: string): { hasServer: boolean; serverCommand: string
   return { hasServer: true, serverCommand: value };
 }
 
+export type PresetName = "minimal" | "full" | "pair";
+
+const PRESETS: Record<PresetName, Partial<LayoutOptions>> = {
+  minimal: { editorPanes: 1, server: "false" },
+  full: { editorPanes: 3, server: "true" },
+  pair: { editorPanes: 2, server: "true" },
+};
+
+export function isPresetName(value: string): value is PresetName {
+  return value in PRESETS;
+}
+
+export function getPreset(name: PresetName): Partial<LayoutOptions> {
+  return PRESETS[name];
+}
+
 export function planLayout(partial?: Partial<LayoutOptions>): LayoutPlan {
   const opts = { ...DEFAULT_OPTIONS, ...partial };
   const leftColumnCount = Math.ceil(opts.editorPanes / 2);

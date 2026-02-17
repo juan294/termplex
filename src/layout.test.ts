@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planLayout } from "./layout.js";
+import { planLayout, isPresetName, getPreset } from "./layout.js";
 
 describe("planLayout", () => {
   it("returns defaults when called with no options", () => {
@@ -93,5 +93,43 @@ describe("server pane toggle", () => {
     const plan = planLayout({ server: "npm run dev" });
     expect(plan.hasServer).toBe(true);
     expect(plan.serverCommand).toBe("npm run dev");
+  });
+});
+
+describe("layout presets", () => {
+  it("isPresetName recognizes valid presets", () => {
+    expect(isPresetName("minimal")).toBe(true);
+    expect(isPresetName("full")).toBe(true);
+    expect(isPresetName("pair")).toBe(true);
+    expect(isPresetName("unknown")).toBe(false);
+  });
+
+  it("minimal preset: 1 editor pane, no server", () => {
+    const plan = planLayout(getPreset("minimal"));
+    expect(plan.leftColumnCount).toBe(1);
+    expect(plan.rightColumnEditorCount).toBe(0);
+    expect(plan.hasServer).toBe(false);
+  });
+
+  it("full preset: 3 editor panes, server enabled", () => {
+    const plan = planLayout(getPreset("full"));
+    expect(plan.leftColumnCount).toBe(2);
+    expect(plan.rightColumnEditorCount).toBe(1);
+    expect(plan.hasServer).toBe(true);
+  });
+
+  it("pair preset: 2 editor panes, server enabled", () => {
+    const plan = planLayout(getPreset("pair"));
+    expect(plan.leftColumnCount).toBe(1);
+    expect(plan.rightColumnEditorCount).toBe(1);
+    expect(plan.hasServer).toBe(true);
+  });
+
+  it("individual keys override preset values", () => {
+    const preset = getPreset("minimal");
+    const plan = planLayout({ ...preset, editorPanes: 4, server: "true" });
+    expect(plan.leftColumnCount).toBe(2);
+    expect(plan.rightColumnEditorCount).toBe(2);
+    expect(plan.hasServer).toBe(true);
   });
 });
