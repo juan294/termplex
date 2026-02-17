@@ -23,10 +23,10 @@ termplex add myapp ~/code/myapp   # register a project
 termplex myapp                    # launch by project name
 ```
 
-## Default Layout
+## Default Layout (full preset)
 
 ```
-termplex .    (panes=3, editor=claude, sidebar=lazygit)
+termplex .    (panes=3, editor=claude, sidebar=lazygit, server=true)
 
 ┌─────────────────── 75% ───────────────────┬──── 25% ────┐
 │                   │                        │             │
@@ -34,13 +34,37 @@ termplex .    (panes=3, editor=claude, sidebar=lazygit)
 │                   │                        │             │
 ├───────────────────┤────────────────────────│             │
 │                   │                        │             │
-│    claude (2)     │    server (plain shell) │             │
+│    claude (2)     │    server (shell)      │             │
 │                   │                        │             │
 └───────────────────┴────────────────────────┴─────────────┘
       left col             right col            sidebar
 ```
 
-Editor panes are split across two columns using `ceil(N/2)` left, remainder right. The right column always includes an extra plain shell pane for dev servers.
+## Layout Presets
+
+| Preset | Panes | Server | Use case |
+|---|---|---|---|
+| `full` | 3 | yes | Default -- multi-agent coding + dev server |
+| `pair` | 2 | yes | Two editors + dev server |
+| `minimal` | 1 | no | Simple editor + sidebar only |
+
+```bash
+termplex . --layout minimal       # 1 editor pane, no server
+termplex . -l pair                # 2 editors + server
+```
+
+## Per-project Config
+
+Drop a `.termplex` file in your project root to override machine-level config:
+
+```ini
+# .termplex
+layout=minimal
+editor=vim
+server=npm run dev
+```
+
+Config resolution order: **CLI flags > .termplex > machine config > preset > defaults**
 
 ## Commands
 
@@ -52,10 +76,21 @@ Editor panes are split across two columns using `ceil(N/2)` left, remainder righ
 | `termplex list` | List all registered projects |
 | `termplex set <key> [value]` | Set a machine-level config value |
 | `termplex config` | Show current machine configuration |
+
+## CLI Flags
+
+| Flag | Description |
+|---|---|
+| `-l, --layout <preset>` | Use a layout preset (`minimal`, `full`, `pair`) |
+| `--editor <cmd>` | Override editor command |
+| `--panes <n>` | Override number of editor panes |
+| `--editor-size <n>` | Override editor width percentage |
+| `--sidebar <cmd>` | Override sidebar command |
+| `--server <value>` | Server pane: `true`, `false`, or a command |
 | `-h, --help` | Show help message |
 | `-v, --version` | Show version number |
 
-## Config
+## Config Keys
 
 | Key | Default | Description |
 |---|---|---|
@@ -63,13 +98,15 @@ Editor panes are split across two columns using `ceil(N/2)` left, remainder righ
 | `sidebar` | `lazygit` | Command launched in the sidebar pane |
 | `panes` | `3` | Number of editor panes |
 | `editor-size` | `75` | Width percentage for the editor grid |
+| `server` | `true` | Server pane: `true` (shell), `false` (none), or a command |
+| `layout` | | Default layout preset |
 
-Config is stored at `~/.config/termplex/config`. Set values to empty to get a plain shell instead:
+Machine config is stored at `~/.config/termplex/config`:
 
 ```bash
-termplex set sidebar        # sidebar becomes a plain shell
-termplex set editor vim      # use vim as the editor
-termplex set panes 4         # four editor panes
+termplex set editor vim           # use vim as the editor
+termplex set server "npm run dev" # run dev server automatically
+termplex set layout minimal       # default to minimal preset
 ```
 
 ## Alias

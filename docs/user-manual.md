@@ -99,6 +99,9 @@ termplex set editor vim       # use vim instead of claude
 termplex set sidebar          # sidebar becomes a plain shell
 termplex set panes 4          # four editor panes
 termplex set editor-size 80   # editor grid takes 80% width
+termplex set server false     # disable the server pane
+termplex set server "npm run dev"  # run a command in the server pane
+termplex set layout minimal   # default to the minimal preset
 ```
 
 ### `termplex config`
@@ -114,12 +117,100 @@ Machine config:
   editor-size → 75
 ```
 
-### Flags
+### CLI Flags
+
+Flags override both machine and per-project config for a single launch.
 
 | Flag | Description |
 |---|---|
+| `-l`, `--layout <preset>` | Use a layout preset (`minimal`, `full`, `pair`) |
+| `--editor <cmd>` | Override editor command |
+| `--panes <n>` | Override number of editor panes |
+| `--editor-size <n>` | Override editor width percentage |
+| `--sidebar <cmd>` | Override sidebar command |
+| `--server <value>` | Server pane: `true`, `false`, or a command |
 | `-h`, `--help` | Show help message |
 | `-v`, `--version` | Show version number |
+
+```bash
+termplex . --layout minimal
+termplex . -l pair --server "npm run dev"
+termplex . --editor vim --panes 2
+```
+
+## Layout Presets
+
+Presets are named shortcuts for common layout configurations.
+
+| Preset | Editor panes | Server pane | Description |
+|---|---|---|---|
+| `full` | 3 | yes (shell) | Default -- multi-agent coding + dev server |
+| `pair` | 2 | yes (shell) | Two editors + dev server |
+| `minimal` | 1 | no | Simple editor + sidebar |
+
+Use a preset via CLI flag, per-project config, or machine config:
+
+```bash
+# CLI flag (one-time)
+termplex . --layout minimal
+
+# Per-project config (in .termplex)
+layout=minimal
+
+# Machine config (persistent default)
+termplex set layout pair
+```
+
+Individual keys override preset values. For example, `--layout minimal --server true` gives you 1 editor pane but keeps the server pane.
+
+## Server Pane
+
+The server pane sits at the bottom of the right column. It supports three modes:
+
+| Value | Behavior |
+|---|---|
+| `true` (default) | Plain shell -- you run commands manually |
+| `false` or empty | No server pane at all |
+| Any other string | Runs that command automatically (e.g. `npm run dev`) |
+
+```bash
+# Disable the server pane
+termplex . --server false
+
+# Run a dev server automatically
+termplex . --server "npm run dev"
+
+# Persistent config
+termplex set server "python -m http.server"
+```
+
+## Per-project Config
+
+Place a `.termplex` file in your project root to override machine-level config for that project. The file uses the same `key=value` format:
+
+```ini
+# ~/code/myapp/.termplex
+layout=pair
+server=npm run dev
+```
+
+```ini
+# ~/code/cli-tool/.termplex
+layout=minimal
+editor=vim
+```
+
+### Config Resolution Order
+
+When termplex launches, config values are resolved in this order (first wins):
+
+1. **CLI flags** (`--layout`, `--editor`, etc.)
+2. **Project config** (`.termplex` in the target directory)
+3. **Machine config** (`~/.config/termplex/config`)
+4. **Preset expansion** (if a `layout` key resolved above)
+5. **Built-in defaults** (`editor=claude`, `panes=3`, etc.)
+
+This means CLI flags always win, project config overrides machine config, and presets provide a base that individual keys can override.
 
 ## Config Reference
 
@@ -128,15 +219,19 @@ Machine config:
 | `editor` | string | `claude` | Command launched in each editor pane. Set to empty for a plain shell. |
 | `sidebar` | string | `lazygit` | Command launched in the sidebar pane. Set to empty for a plain shell. |
 | `panes` | integer | `3` | Number of editor panes. |
-| `editor-size` | integer | `75` | Width percentage allocated to the editor grid (left side). The sidebar gets the remainder. |
+| `editor-size` | integer | `75` | Width percentage allocated to the editor grid. The sidebar gets the remainder. |
+| `server` | string | `true` | Server pane toggle: `true` (shell), `false` (none), or a command to run. |
+| `layout` | string | | Default layout preset (`minimal`, `full`, or `pair`). |
 
-Config is stored at `~/.config/termplex/config` in `key=value` format.
+Machine config: `~/.config/termplex/config`
+Project config: `.termplex` (in project root)
+Project mappings: `~/.config/termplex/projects`
 
-Project mappings are stored at `~/.config/termplex/projects`.
+All files use `key=value` format, one entry per line.
 
 ## Layout Diagrams
 
-### panes=3 (default)
+### full preset / panes=3 (default)
 
 ```
 ┌─────────────────── 75% ───────────────────┬──── 25% ────┐
@@ -153,6 +248,42 @@ Project mappings are stored at `~/.config/termplex/projects`.
 
 - Left column: `ceil(3/2) = 2` editor panes
 - Right column: `3 - 2 = 1` editor pane + 1 server pane
+
+### pair preset / panes=2
+
+```
+┌─────────────────── 75% ───────────────────┬──── 25% ────┐
+│                   │                        │             │
+│                   │    editor (2)          │             │
+│    editor (1)     │                        │   sidebar   │
+│                   ├────────────────────────│             │
+│                   │                        │             │
+│                   │    server (shell)      │             │
+│                   │                        │             │
+└───────────────────┴────────────────────────┴─────────────┘
+      left col             right col            sidebar
+```
+
+- Left column: 1 editor pane
+- Right column: 1 editor pane + 1 server pane
+
+### minimal preset / panes=1
+
+```
+┌─────────────────── 75% ───────────────────┬──── 25% ────┐
+│                   │                        │             │
+│                   │                        │             │
+│                   │                        │             │
+│    editor (1)     │    (right col empty)   │   sidebar   │
+│                   │                        │             │
+│                   │                        │             │
+│                   │                        │             │
+└───────────────────┴────────────────────────┴─────────────┘
+      left col             right col            sidebar
+```
+
+- Left column: 1 editor pane
+- Right column: empty (no server pane in minimal)
 
 ### panes=4
 
@@ -181,6 +312,7 @@ termplex ships a second binary name `ws` that behaves identically:
 ws .
 ws myapp
 ws set editor vim
+ws . --layout minimal
 ```
 
 ## Troubleshooting
@@ -226,15 +358,15 @@ Register the project with `termplex add` or use a direct path instead.
 
 If tmux reports panes are too small, try:
 
-- Reduce the number of panes: `termplex set panes 2`
+- Reduce the number of panes: `termplex set panes 2` or `--layout minimal`
 - Increase terminal window size
 - Reduce sidebar width: `termplex set editor-size 80`
 
 ### Editor command not found
 
-If your configured editor isn't on PATH, the pane will show an error and fall back to the shell (`exec $SHELL`). Fix by either:
+If your configured editor isn't on PATH, termplex will offer to install it (for known commands like `claude` and `lazygit`) or exit with an error. Fix by either:
 
-- Installing the editor
+- Installing the command
 - Updating the config: `termplex set editor <command-on-path>`
 
 ### Config file location
@@ -246,5 +378,7 @@ All config files are at `~/.config/termplex/`:
   config      machine-level settings
   projects    project name → path mappings
 ```
+
+Per-project config lives in your project root as `.termplex`.
 
 Files are plain text (`key=value` format) and safe to edit manually.
