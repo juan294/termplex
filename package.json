@@ -34,9 +34,6 @@
   "engines": {
     "node": ">=18"
   },
-  "dependencies": {
-    "commander": "^13.0.0"
-  },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@vitest/coverage-v8": "^3.0.0",
