@@ -15,6 +15,15 @@ export interface CLIOverrides {
   server?: string;
 }
 
+function configureTmuxTitle(): void {
+  try {
+    tmux(`set-option -g set-titles on`);
+    tmux(`set-option -g set-titles-string '#{s/^tp-//:session_name}'`);
+  } catch {
+    // Non-critical — continue if title config fails
+  }
+}
+
 function tmux(cmd: string): string {
   return execSync(`tmux ${cmd}`, { encoding: "utf-8" }).trim();
 }
@@ -287,6 +296,7 @@ export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Pr
   try {
     execSync(`tmux has-session -t "${sessionName}"`, { stdio: "ignore" });
     console.log(`Attaching to existing session: ${sessionName}`);
+    configureTmuxTitle();
     execSync(`tmux attach-session -t "${sessionName}"`, { stdio: "inherit" });
     return;
   } catch {
@@ -296,6 +306,7 @@ export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Pr
   buildSession(sessionName, targetDir, plan);
 
   try {
+    configureTmuxTitle();
     execSync(`tmux attach-session -t "${sessionName}"`, { stdio: "inherit" });
   } catch {
     // tmux exited (user detached / closed) — that's fine
