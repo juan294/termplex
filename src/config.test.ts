@@ -7,6 +7,7 @@ import {
   setConfig,
   getConfig,
   listConfig,
+  readKVFile,
 } from "./config.js";
 
 // Mock the filesystem — config.ts uses module-level constants derived from
@@ -92,5 +93,20 @@ describe("machine config", () => {
     setConfig("editor", "vim");
     setConfig("editor", "nano");
     expect(getConfig("editor")).toBe("nano");
+  });
+});
+
+describe("readKVFile", () => {
+  it("reads an existing file", async () => {
+    const store = await getStore();
+    store.set("/tmp/.termplex", "editor=vim\npanes=2\n");
+    const map = readKVFile("/tmp/.termplex");
+    expect(map.get("editor")).toBe("vim");
+    expect(map.get("panes")).toBe("2");
+  });
+
+  it("returns empty map for missing file", () => {
+    const map = readKVFile("/nonexistent/.termplex");
+    expect(map.size).toBe(0);
   });
 });

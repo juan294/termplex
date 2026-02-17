@@ -9,6 +9,7 @@ import {
   listConfig,
 } from "./config.js";
 import { launch } from "./launcher.js";
+import type { CLIOverrides } from "./launcher.js";
 
 const HELP = `
 termplex — Launch configurable multi-pane terminal workspaces
@@ -24,19 +25,37 @@ Usage:
 Options:
   -h, --help                    Show this help message
   -v, --version                 Show version number
+  -l, --layout <preset>         Use a layout preset (minimal, full, pair)
+  --editor <cmd>                Override editor command
+  --panes <n>                   Override number of editor panes
+  --editor-size <n>             Override editor width %
+  --sidebar <cmd>               Override sidebar command
+  --server <value>              Server pane: true, false, or a command
 
 Config keys:
   editor        Command for coding panes (default: claude)
   sidebar       Command for sidebar pane (default: lazygit)
   panes         Number of editor panes (default: 3)
   editor-size   Width % for editor grid (default: 75)
+  server        Server pane toggle (default: true)
+  layout        Default layout preset
+
+Layout presets:
+  minimal       1 editor pane, no server
+  full          3 editor panes + server (default)
+  pair          2 editor panes + server
+
+Per-project config:
+  Place a .termplex file in your project root with key=value pairs.
+  Project config overrides machine config; CLI flags override both.
 
 Examples:
   termplex .                    Launch workspace in current directory
   termplex myapp                Launch workspace for registered project
   termplex add myapp ~/code/app Register a project
   termplex set editor claude    Set the editor command
-  termplex set panes 4          Set number of editor panes
+  termplex . --layout minimal   Launch with minimal preset
+  termplex . --server "npm run dev"  Launch with custom server command
 `.trim();
 
 function showHelp(): void {
@@ -48,6 +67,12 @@ const { values, positionals } = parseArgs({
   options: {
     help: { type: "boolean", short: "h" },
     version: { type: "boolean", short: "v" },
+    layout: { type: "string", short: "l" },
+    editor: { type: "string" },
+    panes: { type: "string" },
+    "editor-size": { type: "string" },
+    sidebar: { type: "string" },
+    server: { type: "string" },
   },
 });
 
@@ -151,6 +176,14 @@ switch (subcommand) {
       targetDir = path;
     }
 
-    await launch(targetDir);
+    const overrides: CLIOverrides = {};
+    if (values.layout) overrides.layout = values.layout;
+    if (values.editor) overrides.editor = values.editor;
+    if (values.panes) overrides.panes = values.panes;
+    if (values["editor-size"]) overrides["editor-size"] = values["editor-size"];
+    if (values.sidebar) overrides.sidebar = values.sidebar;
+    if (values.server) overrides.server = values.server;
+
+    await launch(targetDir, overrides);
   }
 }

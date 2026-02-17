@@ -31,6 +31,21 @@ function writeKV(file: string, map: Map<string, string>): void {
   writeFileSync(file, lines.join("\n") + "\n");
 }
 
+// --- Per-project config ---
+
+export function readKVFile(path: string): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!existsSync(path)) return map;
+  const content = readFileSync(path, "utf-8").trim();
+  if (!content) return map;
+  for (const line of content.split("\n")) {
+    const idx = line.indexOf("=");
+    if (idx === -1) continue;
+    map.set(line.slice(0, idx), line.slice(idx + 1));
+  }
+  return map;
+}
+
 // --- Projects ---
 
 export function addProject(name: string, path: string): void {

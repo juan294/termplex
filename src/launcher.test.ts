@@ -7,8 +7,10 @@ vi.mock("node:child_process", () => ({
 }));
 
 // Mock config
+const mockReadKVFile = vi.fn((_path: string) => new Map<string, string>());
 vi.mock("./config.js", () => ({
   getConfig: vi.fn(),
+  readKVFile: (path: string) => mockReadKVFile(path),
 }));
 
 // Mock fs.existsSync for directory checks
@@ -26,7 +28,7 @@ vi.mock("node:readline", () => ({
 }));
 
 // Import after mocks are set up
-const { launch } = await import("./launcher.js");
+const { launch, resolveConfig } = await import("./launcher.js");
 const { getConfig } = await import("./config.js");
 const { existsSync } = await import("node:fs");
 
@@ -40,6 +42,7 @@ beforeEach(() => {
     return Buffer.from("");
   });
   vi.mocked(existsSync).mockReturnValue(true);
+  mockReadKVFile.mockReturnValue(new Map<string, string>());
 });
 
 describe("tmux detection", () => {
@@ -352,5 +355,72 @@ describe("command dependency checks", () => {
     await expect(launch("/tmp/workspace")).rejects.toThrow("process.exit");
     expect(mockExit).toHaveBeenCalledWith(1);
     mockExit.mockRestore();
+  });
+});
+
+describe("config resolution", () => {
+  it("project config overrides global config", () => {
+    vi.mocked(getConfig).mockImplementation((key: string) => {
+      if (key === "editor") return "claude";
+      return undefined;
+    });
+    mockReadKVFile.mockReturnValue(new Map([["editor", "vim"]]));
+
+    const opts = resolveConfig("/tmp/workspace", {});
+    expect(opts.editor).toBe("vim");
+  });
+
+  it("CLI overrides project config", () => {
+    mockReadKVFile.mockReturnValue(new Map([["editor", "vim"]]));
+
+    const opts = resolveConfig("/tmp/workspace", { editor: "nano" });
+    expect(opts.editor).toBe("nano");
+  });
+
+  it("preset expansion with individual key overrides", () => {
+    // Project file sets layout=minimal (1 pane, no server) but overrides panes=4
+    mockReadKVFile.mockReturnValue(new Map([["layout", "minimal"], ["panes", "4"]]));
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    const opts = resolveConfig("/tmp/workspace", {});
+    // Preset minimal sets editorPanes=1, but project overrides to 4
+    expect(opts.editorPanes).toBe(4);
+    // Preset minimal sets server=false, no override → stays false
+    expect(opts.server).toBe("false");
+  });
+
+  it("unknown preset warns and falls through to defaults", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockReadKVFile.mockReturnValue(new Map([["layout", "bogus"]]));
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    const opts = resolveConfig("/tmp/workspace", {});
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Unknown layout preset: "bogus", using defaults.',
+    );
+    // No preset expansion — opts should have no editorPanes set from preset
+    expect(opts.editorPanes).toBeUndefined();
+    warnSpy.mockRestore();
+  });
+
+  it("CLI flags are passed through to launch", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        throw new Error("no session");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    await launch("/tmp/workspace", { layout: "minimal" });
+
+    const tmuxCalls = mockExecSync.mock.calls
+      .map((c) => c[0] as string)
+      .filter((c) => c.startsWith("tmux "));
+
+    // minimal = 1 pane, no server → only sidebar + right col splits (2 total)
+    const splits = tmuxCalls.filter((c) => c.includes("split-window"));
+    expect(splits.length).toBe(2);
   });
 });

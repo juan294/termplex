@@ -1,9 +1,19 @@
 import { existsSync } from "node:fs";
-import { basename } from "node:path";
+import { basename, join } from "node:path";
 import { createInterface } from "node:readline";
 import { execSync } from "node:child_process";
-import { planLayout } from "./layout.js";
-import { getConfig } from "./config.js";
+import { planLayout, isPresetName, getPreset } from "./layout.js";
+import type { LayoutOptions, LayoutPlan } from "./layout.js";
+import { getConfig, readKVFile } from "./config.js";
+
+export interface CLIOverrides {
+  layout?: string;
+  editor?: string;
+  panes?: string;
+  "editor-size"?: string;
+  sidebar?: string;
+  server?: string;
+}
 
 function tmux(cmd: string): string {
   return execSync(`tmux ${cmd}`, { encoding: "utf-8" }).trim();
@@ -174,15 +184,41 @@ async function ensureTmux(): Promise<void> {
   console.log("tmux installed successfully!\n");
 }
 
-function buildSession(sessionName: string, targetDir: string): void {
-  const editor = getConfig("editor") ?? "claude";
-  const sidebarCommand = getConfig("sidebar") ?? "lazygit";
-  const editorPanes = parseInt(getConfig("panes") ?? "3", 10);
-  const editorSize = parseInt(getConfig("editor-size") ?? "75", 10);
-  const server = getConfig("server") ?? "true";
+export function resolveConfig(targetDir: string, cliOverrides: CLIOverrides): Partial<LayoutOptions> {
+  const project = readKVFile(join(targetDir, ".termplex"));
 
-  const plan = planLayout({ editor, sidebarCommand, editorPanes, editorSize, server });
+  // Resolve layout preset: CLI > project > global
+  const layoutKey = cliOverrides.layout ?? project.get("layout") ?? getConfig("layout");
+  let base: Partial<LayoutOptions> = {};
+  if (layoutKey) {
+    if (isPresetName(layoutKey)) {
+      base = getPreset(layoutKey);
+    } else {
+      console.warn(`Unknown layout preset: "${layoutKey}", using defaults.`);
+    }
+  }
 
+  // Layer: CLI > project > global > preset (for each config key)
+  const pick = (cli: string | undefined, projKey: string): string | undefined =>
+    cli ?? project.get(projKey) ?? getConfig(projKey);
+
+  const editor = pick(cliOverrides.editor, "editor");
+  const sidebar = pick(cliOverrides.sidebar, "sidebar");
+  const panes = pick(cliOverrides.panes, "panes");
+  const editorSize = pick(cliOverrides["editor-size"], "editor-size");
+  const server = pick(cliOverrides.server, "server");
+
+  const result: Partial<LayoutOptions> = { ...base };
+  if (editor !== undefined) result.editor = editor;
+  if (sidebar !== undefined) result.sidebarCommand = sidebar;
+  if (panes !== undefined) result.editorPanes = parseInt(panes, 10);
+  if (editorSize !== undefined) result.editorSize = parseInt(editorSize, 10);
+  if (server !== undefined) result.server = server;
+
+  return result;
+}
+
+function buildSession(sessionName: string, targetDir: string, plan: LayoutPlan): void {
   // Create detached session and capture the root pane ID
   tmux(`new-session -d -s "${sessionName}" -c "${targetDir}"`);
   const rootId = tmux(`display -t "${sessionName}:0" -p "#{pane_id}"`);
@@ -226,7 +262,7 @@ function buildSession(sessionName: string, targetDir: string): void {
   tmux(`select-pane -t "${rootId}"`);
 }
 
-export async function launch(targetDir: string): Promise<void> {
+export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Promise<void> {
   if (!existsSync(targetDir)) {
     console.error(`Directory not found: ${targetDir}`);
     process.exit(1);
@@ -234,15 +270,13 @@ export async function launch(targetDir: string): Promise<void> {
 
   await ensureTmux();
 
-  const editor = getConfig("editor") ?? "claude";
-  const sidebar = getConfig("sidebar") ?? "lazygit";
-  const server = getConfig("server") ?? "true";
-  if (editor) await ensureCommand(editor);
-  if (sidebar) await ensureCommand(sidebar);
+  const opts = resolveConfig(targetDir, cliOverrides ?? {});
+  const plan = planLayout(opts);
 
-  // If server is a custom command (not "true"/"false"/""), check the binary
-  if (server && server !== "true" && server !== "false") {
-    const serverBin = server.split(" ")[0]!;
+  if (plan.editor) await ensureCommand(plan.editor);
+  if (plan.sidebarCommand) await ensureCommand(plan.sidebarCommand);
+  if (plan.serverCommand) {
+    const serverBin = plan.serverCommand.split(" ")[0]!;
     await ensureCommand(serverBin);
   }
 
@@ -259,7 +293,7 @@ export async function launch(targetDir: string): Promise<void> {
     // Session doesn't exist — create it below
   }
 
-  buildSession(sessionName, targetDir);
+  buildSession(sessionName, targetDir, plan);
 
   try {
     execSync(`tmux attach-session -t "${sessionName}"`, { stdio: "inherit" });
