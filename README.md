@@ -82,6 +82,7 @@ Config resolution order: **CLI flags > .termplex > machine config > preset > def
 | Flag | Description |
 |---|---|
 | `-l, --layout <preset>` | Use a layout preset (`minimal`, `full`, `pair`) |
+| `-f, --force` | Kill existing session and recreate it |
 | `--editor <cmd>` | Override editor command |
 | `--panes <n>` | Override number of editor panes |
 | `--editor-size <n>` | Override editor width percentage |

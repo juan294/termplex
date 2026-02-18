@@ -143,6 +143,7 @@ Flags override both machine and per-project config for a single launch.
 | `--editor-size <n>` | Override editor width percentage |
 | `--sidebar <cmd>` | Override sidebar command |
 | `--server <value>` | Server pane: `true`, `false`, or a command |
+| `-f`, `--force` | Kill existing session and recreate it |
 | `-h`, `--help` | Show help message |
 | `-v`, `--version` | Show version number |
 
@@ -150,6 +151,8 @@ Flags override both machine and per-project config for a single launch.
 termplex . --layout minimal
 termplex . -l pair --server "npm run dev"
 termplex . --editor vim --panes 2
+termplex . --force              # recreate an existing session
+termplex . -f -l minimal        # recreate with a different layout
 ```
 
 ## Layout Presets
@@ -318,6 +321,12 @@ All files use `key=value` format, one entry per line.
 - Left column: `ceil(4/2) = 2` editor panes
 - Right column: `4 - 2 = 2` editor panes + 1 server pane
 
+## Terminal Tab Titles
+
+termplex automatically sets the terminal tab title to the project directory name. If your project folder is `myapp`, the tab will display **myapp** instead of the default shell name (e.g. "zsh").
+
+This works with Ghostty, iTerm2, WezTerm, kitty, and other terminals that support tmux title propagation. termplex configures tmux's `set-titles` option each time it attaches to a session.
+
 ## The `ws` Alias
 
 termplex ships a second binary name `ws` that behaves identically:
@@ -351,7 +360,14 @@ sudo pacman -S tmux
 
 ### Session already exists
 
-If you run `termplex .` and a session for that directory already exists, termplex attaches to it. To start fresh, kill the existing session first:
+If you run `termplex .` and a session for that directory already exists, termplex attaches to it. To recreate the session with a new layout, use the `--force` flag:
+
+```bash
+termplex . --force
+termplex . -f -l minimal
+```
+
+You can also kill the session manually:
 
 ```bash
 tmux kill-session -t tp-myapp
