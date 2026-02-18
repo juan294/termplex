@@ -163,15 +163,42 @@ describe("server pane toggle", () => {
     await launch("/tmp/workspace");
 
     // With 1 editor pane and no server: left=1, right=0
-    // Should have: new-session, split for sidebar, split for right col
-    // But right col has 0 editors + 0 server = no vertical splits in right col
+    // Should have: new-session, split for sidebar only (no right col needed)
     const tmuxCalls = mockExecSync.mock.calls
       .map((c) => c[0] as string)
       .filter((c) => c.startsWith("tmux "));
 
-    // Count split-window calls — should be exactly 2 (sidebar + right col)
+    // Count split-window calls — should be exactly 1 (sidebar only)
+    const splits = tmuxCalls.filter((c) => c.includes("split-window"));
+    expect(splits.length).toBe(1);
+  });
+
+  it("creates server-only right column when no right-col editors", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        throw new Error("no session");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    await launch("/tmp/workspace", { layout: "cli" });
+
+    const tmuxCalls = mockExecSync.mock.calls
+      .map((c) => c[0] as string)
+      .filter((c) => c.startsWith("tmux "));
+
+    // cli = 1 pane + server → sidebar split + right col split (2 total)
     const splits = tmuxCalls.filter((c) => c.includes("split-window"));
     expect(splits.length).toBe(2);
+
+    // Right col pane should have server command, not editor
+    const serverSplit = splits.find((c) => c.includes("npm login"));
+    expect(serverSplit).toBeDefined();
+    const editorSplits = splits.filter((c) => c.includes("claude"));
+    // No split should launch claude — the only editor is the root pane (respawned)
+    expect(editorSplits.length).toBe(0);
   });
 
   it("passes custom server command to pane", async () => {
@@ -419,8 +446,8 @@ describe("config resolution", () => {
       .map((c) => c[0] as string)
       .filter((c) => c.startsWith("tmux "));
 
-    // minimal = 1 pane, no server → only sidebar + right col splits (2 total)
+    // minimal = 1 pane, no server → only sidebar split (1 total)
     const splits = tmuxCalls.filter((c) => c.includes("split-window"));
-    expect(splits.length).toBe(2);
+    expect(splits.length).toBe(1);
   });
 });

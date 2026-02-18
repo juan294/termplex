@@ -236,8 +236,16 @@ function buildSession(sessionName: string, targetDir: string, plan: LayoutPlan):
   // Split right for sidebar — pass command directly to avoid timing issues
   splitPane(rootId, "h", plan.sidebarSize, targetDir, plan.sidebarCommand || undefined);
 
-  // Split left area into two columns — right col first pane gets editor
-  const rightColId = splitPane(rootId, "h", 50, targetDir, plan.editor || undefined);
+  // --- Right column (only if there are editor panes or a server pane) ---
+  const serverCount = plan.hasServer ? 1 : 0;
+  const totalRight = plan.rightColumnEditorCount + serverCount;
+  let rightColId: string | null = null;
+  if (totalRight > 0) {
+    const firstCmd = plan.rightColumnEditorCount > 0
+      ? (plan.editor || undefined)
+      : (plan.serverCommand ?? undefined);
+    rightColId = splitPane(rootId, "h", 50, targetDir, firstCmd);
+  }
 
   // --- Left column: additional editor panes ---
   let target = rootId;
@@ -249,18 +257,18 @@ function buildSession(sessionName: string, targetDir: string, plan: LayoutPlan):
   }
 
   // --- Right column: additional editor panes + optional server pane ---
-  const serverCount = plan.hasServer ? 1 : 0;
-  const totalRight = plan.rightColumnEditorCount + serverCount;
-  target = rightColId;
-  for (let i = 1; i < totalRight; i++) {
-    const isServer = plan.hasServer && i === totalRight - 1;
-    const pct = Math.floor(
-      ((totalRight - i) / (totalRight - i + 1)) * 100,
-    );
-    const cmd = isServer
-      ? (plan.serverCommand ?? undefined)
-      : (plan.editor || undefined);
-    target = splitPane(target, "v", pct, targetDir, cmd);
+  if (rightColId) {
+    target = rightColId;
+    for (let i = 1; i < totalRight; i++) {
+      const isServer = plan.hasServer && i === totalRight - 1;
+      const pct = Math.floor(
+        ((totalRight - i) / (totalRight - i + 1)) * 100,
+      );
+      const cmd = isServer
+        ? (plan.serverCommand ?? undefined)
+        : (plan.editor || undefined);
+      target = splitPane(target, "v", pct, targetDir, cmd);
+    }
   }
 
   // Root pane was created with a plain shell — replace it with the editor
