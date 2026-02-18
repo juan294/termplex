@@ -35,12 +35,13 @@ function parseServer(value: string): { hasServer: boolean; serverCommand: string
   return { hasServer: true, serverCommand: value };
 }
 
-export type PresetName = "minimal" | "full" | "pair";
+export type PresetName = "minimal" | "full" | "pair" | "cli";
 
 const PRESETS: Record<PresetName, Partial<LayoutOptions>> = {
   minimal: { editorPanes: 1, server: "false" },
   full: { editorPanes: 3, server: "true" },
   pair: { editorPanes: 2, server: "true" },
+  cli: { editorPanes: 1, server: "npm login" },
 };
 
 export function isPresetName(value: string): value is PresetName {

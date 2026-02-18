@@ -137,7 +137,7 @@ Flags override both machine and per-project config for a single launch.
 
 | Flag | Description |
 |---|---|
-| `-l`, `--layout <preset>` | Use a layout preset (`minimal`, `full`, `pair`) |
+| `-l`, `--layout <preset>` | Use a layout preset (`minimal`, `full`, `pair`, `cli`) |
 | `--editor <cmd>` | Override editor command |
 | `--panes <n>` | Override number of editor panes |
 | `--editor-size <n>` | Override editor width percentage |
@@ -164,6 +164,7 @@ Presets are named shortcuts for common layout configurations.
 | `full` | 3 | yes (shell) | Default -- multi-agent coding + dev server |
 | `pair` | 2 | yes (shell) | Two editors + dev server |
 | `minimal` | 1 | no | Simple editor + sidebar |
+| `cli` | 1 | yes (`npm login`) | CLI tool development -- editor + npm login |
 
 Use a preset via CLI flag, per-project config, or machine config:
 
@@ -238,7 +239,7 @@ This means CLI flags always win, project config overrides machine config, and pr
 | `panes` | integer | `3` | Number of editor panes. |
 | `editor-size` | integer | `75` | Width percentage allocated to the editor grid. The sidebar gets the remainder. |
 | `server` | string | `true` | Server pane toggle: `true` (shell), `false` (none), or a command to run. |
-| `layout` | string | | Default layout preset (`minimal`, `full`, or `pair`). |
+| `layout` | string | | Default layout preset (`minimal`, `full`, `pair`, or `cli`). |
 
 Machine config: `~/.config/termplex/config`
 Project config: `.termplex` (in project root)
@@ -301,6 +302,24 @@ All files use `key=value` format, one entry per line.
 
 - Left column: 1 editor pane
 - Right column: empty (no server pane in minimal)
+
+### cli preset / panes=1
+
+```
+┌─────────────────── 75% ───────────────────┬──── 25% ────┐
+│                   │                        │             │
+│                   │                        │             │
+│                   │                        │             │
+│    editor (1)     │    npm login           │   lazygit   │
+│                   │                        │             │
+│                   │                        │             │
+│                   │                        │             │
+└───────────────────┴────────────────────────┴─────────────┘
+      left col             right col            sidebar
+```
+
+- Left column: 1 editor pane
+- Right column: server pane running `npm login`
 
 ### panes=4
 
