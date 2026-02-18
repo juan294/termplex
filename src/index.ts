@@ -63,7 +63,7 @@ function showHelp(): void {
   console.log(HELP);
 }
 
-const { values, positionals } = parseArgs({
+const parseOpts = {
   allowPositionals: true,
   options: {
     help: { type: "boolean", short: "h" },
@@ -76,7 +76,20 @@ const { values, positionals } = parseArgs({
     sidebar: { type: "string" },
     server: { type: "string" },
   },
-});
+} as const;
+
+function safeParse() {
+  try {
+    return parseArgs(parseOpts);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`Error: ${msg}`);
+    console.error(`Run 'termplex --help' for usage information.`);
+    process.exit(1);
+  }
+}
+
+const { values, positionals } = safeParse();
 
 if (values.version) {
   console.log(__VERSION__);
