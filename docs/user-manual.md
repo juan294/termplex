@@ -18,6 +18,20 @@ npm i -g termplex
 
 This installs two commands: `termplex` and `ws` (a shorter alias).
 
+## Updating
+
+To update termplex to the latest version, re-run the install command:
+
+```bash
+npm i -g termplex
+```
+
+You can check your current version at any time with:
+
+```bash
+termplex --version
+```
+
 ## First Launch Walkthrough
 
 ```bash
