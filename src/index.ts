@@ -25,6 +25,7 @@ Usage:
 Options:
   -h, --help                    Show this help message
   -v, --version                 Show version number
+  -f, --force                   Kill existing session and recreate it
   -l, --layout <preset>         Use a layout preset (minimal, full, pair)
   --editor <cmd>                Override editor command
   --panes <n>                   Override number of editor panes
@@ -67,6 +68,7 @@ const { values, positionals } = parseArgs({
   options: {
     help: { type: "boolean", short: "h" },
     version: { type: "boolean", short: "v" },
+    force: { type: "boolean", short: "f" },
     layout: { type: "string", short: "l" },
     editor: { type: "string" },
     panes: { type: "string" },
@@ -183,6 +185,7 @@ switch (subcommand) {
     if (values["editor-size"]) overrides["editor-size"] = values["editor-size"];
     if (values.sidebar) overrides.sidebar = values.sidebar;
     if (values.server) overrides.server = values.server;
+    if (values.force) overrides.force = true;
 
     await launch(targetDir, overrides);
   }

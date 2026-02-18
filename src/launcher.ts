@@ -13,6 +13,7 @@ export interface CLIOverrides {
   "editor-size"?: string;
   sidebar?: string;
   server?: string;
+  force?: boolean;
 }
 
 function configureTmuxTitle(): void {
@@ -292,13 +293,17 @@ export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Pr
   const dirName = basename(targetDir).replace(/[^a-zA-Z0-9_-]/g, "_");
   const sessionName = `tp-${dirName}`;
 
-  // If session already exists, just re-attach
+  // If session already exists, kill it with --force or re-attach
   try {
     execSync(`tmux has-session -t "${sessionName}"`, { stdio: "ignore" });
-    console.log(`Attaching to existing session: ${sessionName}`);
-    configureTmuxTitle();
-    execSync(`tmux attach-session -t "${sessionName}"`, { stdio: "inherit" });
-    return;
+    if (cliOverrides?.force) {
+      execSync(`tmux kill-session -t "${sessionName}"`, { stdio: "ignore" });
+    } else {
+      console.log(`Attaching to existing session: ${sessionName}`);
+      configureTmuxTitle();
+      execSync(`tmux attach-session -t "${sessionName}"`, { stdio: "inherit" });
+      return;
+    }
   } catch {
     // Session doesn't exist — create it below
   }
