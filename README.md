@@ -89,6 +89,7 @@ Config resolution order: **CLI flags > .termplex > machine config > preset > def
 | `--editor-size <n>` | Override editor width percentage |
 | `--sidebar <cmd>` | Override sidebar command |
 | `--server <value>` | Server pane: `true`, `false`, or a command |
+| `--mouse` / `--no-mouse` | Enable/disable tmux mouse mode (default: on) |
 | `-h, --help` | Show help message |
 | `-v, --version` | Show version number |
 
@@ -101,6 +102,7 @@ Config resolution order: **CLI flags > .termplex > machine config > preset > def
 | `panes` | `3` | Number of editor panes |
 | `editor-size` | `75` | Width percentage for the editor grid |
 | `server` | `true` | Server pane: `true` (shell), `false` (none), or a command |
+| `mouse` | `true` | Enable tmux mouse mode: `true` or `false` |
 | `layout` | | Default layout preset |
 
 Machine config is stored at `~/.config/termplex/config`:

@@ -393,14 +393,14 @@ describe("config resolution", () => {
     });
     mockReadKVFile.mockReturnValue(new Map([["editor", "vim"]]));
 
-    const opts = resolveConfig("/tmp/workspace", {});
+    const { opts } = resolveConfig("/tmp/workspace", {});
     expect(opts.editor).toBe("vim");
   });
 
   it("CLI overrides project config", () => {
     mockReadKVFile.mockReturnValue(new Map([["editor", "vim"]]));
 
-    const opts = resolveConfig("/tmp/workspace", { editor: "nano" });
+    const { opts } = resolveConfig("/tmp/workspace", { editor: "nano" });
     expect(opts.editor).toBe("nano");
   });
 
@@ -409,7 +409,7 @@ describe("config resolution", () => {
     mockReadKVFile.mockReturnValue(new Map([["layout", "minimal"], ["panes", "4"]]));
     vi.mocked(getConfig).mockReturnValue(undefined);
 
-    const opts = resolveConfig("/tmp/workspace", {});
+    const { opts } = resolveConfig("/tmp/workspace", {});
     // Preset minimal sets editorPanes=1, but project overrides to 4
     expect(opts.editorPanes).toBe(4);
     // Preset minimal sets server=false, no override → stays false
@@ -421,7 +421,7 @@ describe("config resolution", () => {
     mockReadKVFile.mockReturnValue(new Map([["layout", "bogus"]]));
     vi.mocked(getConfig).mockReturnValue(undefined);
 
-    const opts = resolveConfig("/tmp/workspace", {});
+    const { opts } = resolveConfig("/tmp/workspace", {});
     expect(warnSpy).toHaveBeenCalledWith(
       'Unknown layout preset: "bogus", using defaults.',
     );
@@ -449,5 +449,91 @@ describe("config resolution", () => {
     // minimal = 1 pane, no server → only sidebar split (1 total)
     const splits = tmuxCalls.filter((c) => c.includes("split-window"));
     expect(splits.length).toBe(1);
+  });
+});
+
+describe("mouse mode", () => {
+  it("defaults to mouse on", () => {
+    vi.mocked(getConfig).mockReturnValue(undefined);
+    mockReadKVFile.mockReturnValue(new Map());
+
+    const { mouse } = resolveConfig("/tmp/workspace", {});
+    expect(mouse).toBe(true);
+  });
+
+  it("respects --no-mouse CLI flag", () => {
+    vi.mocked(getConfig).mockReturnValue(undefined);
+    mockReadKVFile.mockReturnValue(new Map());
+
+    const { mouse } = resolveConfig("/tmp/workspace", { mouse: false });
+    expect(mouse).toBe(false);
+  });
+
+  it("respects mouse=false in project config", () => {
+    vi.mocked(getConfig).mockReturnValue(undefined);
+    mockReadKVFile.mockReturnValue(new Map([["mouse", "false"]]));
+
+    const { mouse } = resolveConfig("/tmp/workspace", {});
+    expect(mouse).toBe(false);
+  });
+
+  it("respects mouse=false in machine config", () => {
+    vi.mocked(getConfig).mockImplementation((key: string) => {
+      if (key === "mouse") return "false";
+      return undefined;
+    });
+    mockReadKVFile.mockReturnValue(new Map());
+
+    const { mouse } = resolveConfig("/tmp/workspace", {});
+    expect(mouse).toBe(false);
+  });
+
+  it("CLI --mouse overrides project mouse=false", () => {
+    vi.mocked(getConfig).mockReturnValue(undefined);
+    mockReadKVFile.mockReturnValue(new Map([["mouse", "false"]]));
+
+    const { mouse } = resolveConfig("/tmp/workspace", { mouse: true });
+    expect(mouse).toBe(true);
+  });
+
+  it("sets tmux mouse option when building a new session", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        throw new Error("no session");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    await launch("/tmp/workspace");
+
+    const tmuxCalls = mockExecSync.mock.calls
+      .map((c) => c[0] as string)
+      .filter((c) => c.startsWith("tmux "));
+
+    expect(tmuxCalls.some((c) => c.includes("set-option") && c.includes("mouse on"))).toBe(true);
+  });
+
+  it("sets mouse off when disabled via config", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        throw new Error("no session");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    vi.mocked(getConfig).mockImplementation((key: string) => {
+      if (key === "mouse") return "false";
+      return undefined;
+    });
+
+    await launch("/tmp/workspace");
+
+    const tmuxCalls = mockExecSync.mock.calls
+      .map((c) => c[0] as string)
+      .filter((c) => c.startsWith("tmux "));
+
+    expect(tmuxCalls.some((c) => c.includes("set-option") && c.includes("mouse off"))).toBe(true);
   });
 });

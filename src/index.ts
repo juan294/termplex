@@ -32,6 +32,7 @@ Options:
   --editor-size <n>             Override editor width %
   --sidebar <cmd>               Override sidebar command
   --server <value>              Server pane: true, false, or a command
+  --mouse / --no-mouse          Enable/disable mouse mode (default: on)
 
 Config keys:
   editor        Command for coding panes (default: claude)
@@ -39,6 +40,7 @@ Config keys:
   panes         Number of editor panes (default: 3)
   editor-size   Width % for editor grid (default: 75)
   server        Server pane toggle (default: true)
+  mouse         Enable tmux mouse mode (default: true)
   layout        Default layout preset
 
 Layout presets:
@@ -76,6 +78,7 @@ const parseOpts = {
     "editor-size": { type: "string" },
     sidebar: { type: "string" },
     server: { type: "string" },
+    mouse: { type: "boolean" },
   },
 } as const;
 
@@ -199,6 +202,7 @@ switch (subcommand) {
     if (values["editor-size"]) overrides["editor-size"] = values["editor-size"];
     if (values.sidebar) overrides.sidebar = values.sidebar;
     if (values.server) overrides.server = values.server;
+    if (values.mouse !== undefined) overrides.mouse = values.mouse;
     if (values.force) overrides.force = true;
 
     await launch(targetDir, overrides);

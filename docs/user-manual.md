@@ -115,6 +115,7 @@ termplex set panes 4          # four editor panes
 termplex set editor-size 80   # editor grid takes 80% width
 termplex set server false     # disable the server pane
 termplex set server "npm run dev"  # run a command in the server pane
+termplex set mouse false      # disable mouse mode
 termplex set layout minimal   # default to the minimal preset
 ```
 
@@ -143,6 +144,7 @@ Flags override both machine and per-project config for a single launch.
 | `--editor-size <n>` | Override editor width percentage |
 | `--sidebar <cmd>` | Override sidebar command |
 | `--server <value>` | Server pane: `true`, `false`, or a command |
+| `--mouse` / `--no-mouse` | Enable/disable tmux mouse mode (default: on) |
 | `-f`, `--force` | Kill existing session and recreate it |
 | `-h`, `--help` | Show help message |
 | `-v`, `--version` | Show version number |
@@ -151,6 +153,7 @@ Flags override both machine and per-project config for a single launch.
 termplex . --layout minimal
 termplex . -l pair --server "npm run dev"
 termplex . --editor vim --panes 2
+termplex . --no-mouse           # launch without mouse mode
 termplex . --force              # recreate an existing session
 termplex . -f -l minimal        # recreate with a different layout
 ```
@@ -239,6 +242,7 @@ This means CLI flags always win, project config overrides machine config, and pr
 | `panes` | integer | `3` | Number of editor panes. |
 | `editor-size` | integer | `75` | Width percentage allocated to the editor grid. The sidebar gets the remainder. |
 | `server` | string | `true` | Server pane toggle: `true` (shell), `false` (none), or a command to run. |
+| `mouse` | string | `true` | Enable tmux mouse mode: `true` (on) or `false` (off). |
 | `layout` | string | | Default layout preset (`minimal`, `full`, `pair`, or `cli`). |
 
 Machine config: `~/.config/termplex/config`

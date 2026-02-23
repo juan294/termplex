@@ -13,6 +13,7 @@ export interface CLIOverrides {
   "editor-size"?: string;
   sidebar?: string;
   server?: string;
+  mouse?: boolean;
   force?: boolean;
 }
 
@@ -194,7 +195,12 @@ async function ensureTmux(): Promise<void> {
   console.log("tmux installed successfully!\n");
 }
 
-export function resolveConfig(targetDir: string, cliOverrides: CLIOverrides): Partial<LayoutOptions> {
+export interface ResolvedConfig {
+  opts: Partial<LayoutOptions>;
+  mouse: boolean;
+}
+
+export function resolveConfig(targetDir: string, cliOverrides: CLIOverrides): ResolvedConfig {
   const project = readKVFile(join(targetDir, ".termplex"));
 
   // Resolve layout preset: CLI > project > global
@@ -218,6 +224,9 @@ export function resolveConfig(targetDir: string, cliOverrides: CLIOverrides): Pa
   const editorSize = pick(cliOverrides["editor-size"], "editor-size");
   const server = pick(cliOverrides.server, "server");
 
+  // Mouse: CLI > project > global > default (true)
+  const mouse = cliOverrides.mouse ?? (project.has("mouse") ? project.get("mouse") !== "false" : (getConfig("mouse") !== "false"));
+
   const result: Partial<LayoutOptions> = { ...base };
   if (editor !== undefined) result.editor = editor;
   if (sidebar !== undefined) result.sidebarCommand = sidebar;
@@ -225,13 +234,24 @@ export function resolveConfig(targetDir: string, cliOverrides: CLIOverrides): Pa
   if (editorSize !== undefined) result.editorSize = parseInt(editorSize, 10);
   if (server !== undefined) result.server = server;
 
-  return result;
+  return { opts: result, mouse };
 }
 
-function buildSession(sessionName: string, targetDir: string, plan: LayoutPlan): void {
+function configureMouseMode(sessionName: string, mouse: boolean): void {
+  try {
+    tmux(`set-option -t "${sessionName}" mouse ${mouse ? "on" : "off"}`);
+  } catch {
+    // Non-critical — continue if mouse config fails
+  }
+}
+
+function buildSession(sessionName: string, targetDir: string, plan: LayoutPlan, mouse: boolean): void {
   // Create detached session and capture the root pane ID
   tmux(`new-session -d -s "${sessionName}" -c "${targetDir}"`);
   const rootId = tmux(`display -t "${sessionName}:0" -p "#{pane_id}"`);
+
+  // Enable/disable mouse mode for this session
+  configureMouseMode(sessionName, mouse);
 
   // Split right for sidebar — pass command directly to avoid timing issues
   splitPane(rootId, "h", plan.sidebarSize, targetDir, plan.sidebarCommand || undefined);
@@ -288,7 +308,7 @@ export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Pr
 
   await ensureTmux();
 
-  const opts = resolveConfig(targetDir, cliOverrides ?? {});
+  const { opts, mouse } = resolveConfig(targetDir, cliOverrides ?? {});
   const plan = planLayout(opts);
 
   if (plan.editor) await ensureCommand(plan.editor);
@@ -308,6 +328,7 @@ export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Pr
       execSync(`tmux kill-session -t "${sessionName}"`, { stdio: "ignore" });
     } else {
       console.log(`Attaching to existing session: ${sessionName}`);
+      configureMouseMode(sessionName, mouse);
       configureTmuxTitle();
       execSync(`tmux attach-session -t "${sessionName}"`, { stdio: "inherit" });
       return;
@@ -316,7 +337,7 @@ export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Pr
     // Session doesn't exist — create it below
   }
 
-  buildSession(sessionName, targetDir, plan);
+  buildSession(sessionName, targetDir, plan, mouse);
 
   try {
     configureTmuxTitle();
