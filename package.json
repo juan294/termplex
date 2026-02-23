@@ -1,6 +1,6 @@
 {
   "name": "termplex",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Launch configurable multi-pane terminal workspaces with one command",
   "type": "module",
   "packageManager": "pnpm@10.29.2",
