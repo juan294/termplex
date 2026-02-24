@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { homedir } from "node:os";
 
 const CONFIG_DIR = join(homedir(), ".config", "termplex");

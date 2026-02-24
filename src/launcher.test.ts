@@ -358,10 +358,8 @@ describe("command dependency checks", () => {
   });
 
   it("exits when user declines install", async () => {
-    let claudeCallCount = 0;
     mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
       if (cmd === "command -v claude") {
-        claudeCallCount++;
         throw new Error("not found");
       }
       if (typeof cmd === "string" && cmd.startsWith("command -v "))
