@@ -31,7 +31,7 @@ index.ts
 ```
 CLI invocation
   → node:util parseArgs
-      flags: --help, --version, --layout, --editor, --panes, --editor-size, --sidebar, --server
+      flags: --help, --version, --force, --layout, --editor, --panes, --editor-size, --sidebar, --server, --mouse/--no-mouse
       positionals: subcommand + args
   → subcommand dispatch (switch/case)
       ├── add/remove/list/set/config → config.ts read/write
@@ -46,7 +46,7 @@ CLI invocation
                     → expand preset if layout is a valid preset name
                     → layer each key: CLI > project > global > preset
                 → planLayout(resolvedOpts) — compute pane counts and sizes
-                → ensureCommand() for editor, sidebar, serverCommand
+                → ensureCommand() for editor, sidebar, secondaryEditor, serverCommand
                 → check for existing session → attach if found
                 → buildSession(sessionName, targetDir, plan)
                     → create tmux session + split panes
@@ -64,20 +64,22 @@ CLI flags  >  .termplex  >  ~/.config/termplex/config  >  preset expansion  >  b
 
 1. Read project `.termplex` file via `readKVFile(join(targetDir, ".termplex"))`
 2. Resolve the `layout` key (CLI > project > global) and expand the matching preset as a base
-3. For each config key (`editor`, `sidebar`, `panes`, `editor-size`, `server`), pick the highest-priority value: CLI > project > global > preset
+3. For each config key (`editor`, `sidebar`, `panes`, `editor-size`, `server`), pick the highest-priority value: CLI > project > global > preset. Note: `secondaryEditor` is only settable via presets, not through CLI or config files.
 4. Return partial `LayoutOptions` — `planLayout()` fills remaining defaults
 
 ## Layout Presets
 
 Defined in `layout.ts` as a `Record<PresetName, Partial<LayoutOptions>>`:
 
-| Preset | `editorPanes` | `server` |
-|---|---|---|
-| `minimal` | 1 | `"false"` |
-| `full` | 3 | `"true"` |
-| `pair` | 2 | `"true"` |
+| Preset | `editorPanes` | `server` | `secondaryEditor` |
+|---|---|---|---|
+| `minimal` | 1 | `"false"` | |
+| `full` | 3 | `"true"` | |
+| `pair` | 2 | `"true"` | |
+| `cli` | 1 | `"npm login"` | |
+| `mtop` | 2 | `"true"` | `"mtop"` |
 
-`isPresetName(value)` is a type guard. `getPreset(name)` returns the partial options. Presets only set `editorPanes` and `server`; all other keys fall through to higher-priority sources or defaults.
+`isPresetName(value)` is a type guard. `getPreset(name)` returns the partial options. Presets set `editorPanes`, `server`, and optionally `secondaryEditor`; all other keys fall through to higher-priority sources or defaults.
 
 ## Layout Algorithm
 
@@ -98,6 +100,10 @@ Given `N` editor panes (default 3) and server toggle:
 | anything else | `true` | the input string |
 
 When `hasServer` is false, the right column contains only editor panes (no extra split).
+
+### Secondary Editor
+
+`secondaryEditor` in `LayoutPlan` allows a preset to specify a different command for right-column editor panes instead of the main `editor`. When set (e.g., `"mtop"` in the `mtop` preset), right-column editor panes launch the secondary editor command; left-column panes still use the primary editor. If `secondaryEditor` is `null`, right-column editor panes use the same command as left-column panes.
 
 ### Split Percentage Formula
 
@@ -123,18 +129,27 @@ where `i` is the 1-based index of the split. This produces equal-height panes. F
 - Left column: 1 editor pane
 - Right column: empty (no server pane)
 
+**cli / panes=1**:
+- Left column: 1 editor pane
+- Right column: 1 server pane running `npm login`
+
+**mtop / panes=2**:
+- Left column: 1 editor pane
+- Right column: 1 `mtop` pane (secondary editor) + 1 server pane
+
 ## tmux Session Construction
 
 `buildSession()` in `launcher.ts` receives a pre-computed `LayoutPlan` and executes:
 
 1. **Create session**: `tmux new-session -d -s "tp-<dirname>" -c <dir>`
 2. **Capture root pane**: `tmux display -t "tp-<dirname>:0" -p "#{pane_id}"`
-3. **Split sidebar**: horizontal split from root pane at `sidebarSize`%, run sidebar command
-4. **Split right column**: horizontal split from root pane at 50%, run editor command — this becomes the first right-column pane
-5. **Split left column**: vertical splits from root pane for additional left-column panes (i=1..leftColumnCount-1), each running the editor
-6. **Split right column panes**: vertical splits from right column pane for additional right-column editor panes + optional server pane (conditional on `hasServer`)
-7. **Respawn root pane**: replace the plain shell in root pane with the editor command
-8. **Focus root pane**: `tmux select-pane -t <rootId>`
+3. **Configure mouse mode**: enable or disable based on resolved `mouse` setting
+4. **Split sidebar**: horizontal split from root pane at `sidebarSize`%, run sidebar command
+5. **Split right column**: horizontal split from root pane at 50%, run secondary editor (if set) or editor command — this becomes the first right-column pane
+6. **Split left column**: vertical splits from root pane for additional left-column panes (i=1..leftColumnCount-1), each running the primary editor
+7. **Split right column panes**: vertical splits from right column pane for additional right-column editor panes (using secondary editor if set) + optional server pane (conditional on `hasServer`)
+8. **Respawn root pane**: replace the plain shell in root pane with the editor command
+9. **Focus root pane**: `tmux select-pane -t <rootId>`
 
 ### Session Naming
 
@@ -142,7 +157,7 @@ Session names use the format `tp-<sanitized-dirname>`, where the directory basen
 
 ### Re-attach Behavior
 
-If a session named `tp-<dirname>` already exists, termplex attaches to it instead of creating a new one.
+If a session named `tp-<dirname>` already exists, termplex attaches to it instead of creating a new one. With `--force`, the existing session is killed and recreated. On attach, mouse mode is reconfigured and terminal tab titles are set via `set-titles`.
 
 ## Config Storage
 
