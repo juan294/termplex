@@ -1,0 +1,1 @@
+exec arch -arm64 sh -c 'pnpm run typecheck && pnpm run lint && pnpm run test'

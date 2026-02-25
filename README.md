@@ -47,6 +47,8 @@ termplex .    (panes=3, editor=claude, sidebar=lazygit, server=true)
 | `full` | 3 | yes | Default -- multi-agent coding + dev server |
 | `pair` | 2 | yes | Two editors + dev server |
 | `minimal` | 1 | no | Simple editor + sidebar only |
+| `cli` | 1 | yes | CLI tool development -- editor + npm login |
+| `mtop` | 2 | yes | System monitoring -- editor + mtop + server |
 
 ```bash
 termplex . --layout minimal       # 1 editor pane, no server
@@ -81,13 +83,14 @@ Config resolution order: **CLI flags > .termplex > machine config > preset > def
 
 | Flag | Description |
 |---|---|
-| `-l, --layout <preset>` | Use a layout preset (`minimal`, `full`, `pair`) |
+| `-l, --layout <preset>` | Use a layout preset (`minimal`, `full`, `pair`, `cli`, `mtop`) |
 | `-f, --force` | Kill existing session and recreate it |
 | `--editor <cmd>` | Override editor command |
 | `--panes <n>` | Override number of editor panes |
 | `--editor-size <n>` | Override editor width percentage |
 | `--sidebar <cmd>` | Override sidebar command |
 | `--server <value>` | Server pane: `true`, `false`, or a command |
+| `--mouse` / `--no-mouse` | Enable/disable tmux mouse mode (default: on) |
 | `-h, --help` | Show help message |
 | `-v, --version` | Show version number |
 
@@ -100,6 +103,7 @@ Config resolution order: **CLI flags > .termplex > machine config > preset > def
 | `panes` | `3` | Number of editor panes |
 | `editor-size` | `75` | Width percentage for the editor grid |
 | `server` | `true` | Server pane: `true` (shell), `false` (none), or a command |
+| `mouse` | `true` | Enable tmux mouse mode: `true` or `false` |
 | `layout` | | Default layout preset |
 
 Machine config is stored at `~/.config/termplex/config`:

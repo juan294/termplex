@@ -4,8 +4,12 @@ dist/
 .DS_Store
 .env
 .env.*
-.claude/
+.claude/*
+!.claude/settings.json
+!.claude/commands/
+.claude/settings.local.json
 .vscode/
 CLAUDE.local.md
 .worktrees/
 coverage/
+logs/

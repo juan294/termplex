@@ -115,6 +115,7 @@ termplex set panes 4          # four editor panes
 termplex set editor-size 80   # editor grid takes 80% width
 termplex set server false     # disable the server pane
 termplex set server "npm run dev"  # run a command in the server pane
+termplex set mouse false      # disable mouse mode
 termplex set layout minimal   # default to the minimal preset
 ```
 
@@ -137,12 +138,13 @@ Flags override both machine and per-project config for a single launch.
 
 | Flag | Description |
 |---|---|
-| `-l`, `--layout <preset>` | Use a layout preset (`minimal`, `full`, `pair`) |
+| `-l`, `--layout <preset>` | Use a layout preset (`minimal`, `full`, `pair`, `cli`, `mtop`) |
 | `--editor <cmd>` | Override editor command |
 | `--panes <n>` | Override number of editor panes |
 | `--editor-size <n>` | Override editor width percentage |
 | `--sidebar <cmd>` | Override sidebar command |
 | `--server <value>` | Server pane: `true`, `false`, or a command |
+| `--mouse` / `--no-mouse` | Enable/disable tmux mouse mode (default: on) |
 | `-f`, `--force` | Kill existing session and recreate it |
 | `-h`, `--help` | Show help message |
 | `-v`, `--version` | Show version number |
@@ -151,6 +153,7 @@ Flags override both machine and per-project config for a single launch.
 termplex . --layout minimal
 termplex . -l pair --server "npm run dev"
 termplex . --editor vim --panes 2
+termplex . --no-mouse           # launch without mouse mode
 termplex . --force              # recreate an existing session
 termplex . -f -l minimal        # recreate with a different layout
 ```
@@ -164,6 +167,8 @@ Presets are named shortcuts for common layout configurations.
 | `full` | 3 | yes (shell) | Default -- multi-agent coding + dev server |
 | `pair` | 2 | yes (shell) | Two editors + dev server |
 | `minimal` | 1 | no | Simple editor + sidebar |
+| `cli` | 1 | yes (`npm login`) | CLI tool development -- editor + npm login |
+| `mtop` | 2 | yes (shell) | System monitoring -- editor + mtop + server |
 
 Use a preset via CLI flag, per-project config, or machine config:
 
@@ -238,7 +243,8 @@ This means CLI flags always win, project config overrides machine config, and pr
 | `panes` | integer | `3` | Number of editor panes. |
 | `editor-size` | integer | `75` | Width percentage allocated to the editor grid. The sidebar gets the remainder. |
 | `server` | string | `true` | Server pane toggle: `true` (shell), `false` (none), or a command to run. |
-| `layout` | string | | Default layout preset (`minimal`, `full`, or `pair`). |
+| `mouse` | string | `true` | Enable tmux mouse mode: `true` (on) or `false` (off). |
+| `layout` | string | | Default layout preset (`minimal`, `full`, `pair`, `cli`, or `mtop`). |
 
 Machine config: `~/.config/termplex/config`
 Project config: `.termplex` (in project root)
@@ -301,6 +307,42 @@ All files use `key=value` format, one entry per line.
 
 - Left column: 1 editor pane
 - Right column: empty (no server pane in minimal)
+
+### cli preset / panes=1
+
+```
+┌─────────────────── 75% ───────────────────┬──── 25% ────┐
+│                   │                        │             │
+│                   │                        │             │
+│                   │                        │             │
+│    editor (1)     │    npm login           │   lazygit   │
+│                   │                        │             │
+│                   │                        │             │
+│                   │                        │             │
+└───────────────────┴────────────────────────┴─────────────┘
+      left col             right col            sidebar
+```
+
+- Left column: 1 editor pane
+- Right column: server pane running `npm login`
+
+### mtop preset / panes=2
+
+```
+┌─────────────────── 75% ───────────────────┬──── 25% ────┐
+│                   │                        │             │
+│                   │    mtop               │             │
+│    editor (1)     │                        │   lazygit   │
+│                   ├────────────────────────│             │
+│                   │                        │             │
+│                   │    server (shell)      │             │
+│                   │                        │             │
+└───────────────────┴────────────────────────┴─────────────┘
+      left col             right col            sidebar
+```
+
+- Left column: 1 editor pane
+- Right column: mtop + 1 server pane
 
 ### panes=4
 

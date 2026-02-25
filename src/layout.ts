@@ -4,6 +4,7 @@ export interface LayoutOptions {
   editorSize: number;
   sidebarCommand: string;
   server: string;
+  secondaryEditor: string;
 }
 
 const DEFAULT_OPTIONS: LayoutOptions = {
@@ -12,6 +13,7 @@ const DEFAULT_OPTIONS: LayoutOptions = {
   editorSize: 75,
   sidebarCommand: "lazygit",
   server: "true",
+  secondaryEditor: "",
 };
 
 export interface LayoutPlan {
@@ -23,6 +25,7 @@ export interface LayoutPlan {
   sidebarCommand: string;
   hasServer: boolean;
   serverCommand: string | null;
+  secondaryEditor: string | null;
 }
 
 function parseServer(value: string): { hasServer: boolean; serverCommand: string | null } {
@@ -35,12 +38,14 @@ function parseServer(value: string): { hasServer: boolean; serverCommand: string
   return { hasServer: true, serverCommand: value };
 }
 
-export type PresetName = "minimal" | "full" | "pair";
+export type PresetName = "minimal" | "full" | "pair" | "cli" | "mtop";
 
 const PRESETS: Record<PresetName, Partial<LayoutOptions>> = {
   minimal: { editorPanes: 1, server: "false" },
   full: { editorPanes: 3, server: "true" },
   pair: { editorPanes: 2, server: "true" },
+  cli: { editorPanes: 1, server: "npm login" },
+  mtop: { editorPanes: 2, server: "true", secondaryEditor: "mtop" },
 };
 
 export function isPresetName(value: string): value is PresetName {
@@ -64,5 +69,6 @@ export function planLayout(partial?: Partial<LayoutOptions>): LayoutPlan {
     sidebarCommand: opts.sidebarCommand,
     hasServer,
     serverCommand,
+    secondaryEditor: opts.secondaryEditor || null,
   };
 }

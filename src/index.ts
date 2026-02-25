@@ -26,12 +26,13 @@ Options:
   -h, --help                    Show this help message
   -v, --version                 Show version number
   -f, --force                   Kill existing session and recreate it
-  -l, --layout <preset>         Use a layout preset (minimal, full, pair)
+  -l, --layout <preset>         Use a layout preset (minimal, full, pair, cli, mtop)
   --editor <cmd>                Override editor command
   --panes <n>                   Override number of editor panes
   --editor-size <n>             Override editor width %
   --sidebar <cmd>               Override sidebar command
   --server <value>              Server pane: true, false, or a command
+  --mouse / --no-mouse          Enable/disable mouse mode (default: on)
 
 Config keys:
   editor        Command for coding panes (default: claude)
@@ -39,12 +40,15 @@ Config keys:
   panes         Number of editor panes (default: 3)
   editor-size   Width % for editor grid (default: 75)
   server        Server pane toggle (default: true)
+  mouse         Enable tmux mouse mode (default: true)
   layout        Default layout preset
 
 Layout presets:
   minimal       1 editor pane, no server
   full          3 editor panes + server (default)
   pair          2 editor panes + server
+  cli           1 editor pane + server (npm login)
+  mtop          editor + mtop + server + lazygit sidebar
 
 Per-project config:
   Place a .termplex file in your project root with key=value pairs.
@@ -75,6 +79,7 @@ const parseOpts = {
     "editor-size": { type: "string" },
     sidebar: { type: "string" },
     server: { type: "string" },
+    mouse: { type: "boolean" },
   },
 } as const;
 
@@ -198,6 +203,7 @@ switch (subcommand) {
     if (values["editor-size"]) overrides["editor-size"] = values["editor-size"];
     if (values.sidebar) overrides.sidebar = values.sidebar;
     if (values.server) overrides.server = values.server;
+    if (values.mouse !== undefined) overrides.mouse = values.mouse;
     if (values.force) overrides.force = true;
 
     await launch(targetDir, overrides);
