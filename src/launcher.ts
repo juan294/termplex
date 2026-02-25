@@ -262,7 +262,7 @@ function buildSession(sessionName: string, targetDir: string, plan: LayoutPlan, 
   let rightColId: string | null = null;
   if (totalRight > 0) {
     const firstCmd = plan.rightColumnEditorCount > 0
-      ? (plan.editor || undefined)
+      ? (plan.secondaryEditor ?? (plan.editor || undefined))
       : (plan.serverCommand ?? undefined);
     rightColId = splitPane(rootId, "h", 50, targetDir, firstCmd);
   }
@@ -286,7 +286,7 @@ function buildSession(sessionName: string, targetDir: string, plan: LayoutPlan, 
       );
       const cmd = isServer
         ? (plan.serverCommand ?? undefined)
-        : (plan.editor || undefined);
+        : (plan.secondaryEditor ?? (plan.editor || undefined));
       target = splitPane(target, "v", pct, targetDir, cmd);
     }
   }
@@ -313,6 +313,10 @@ export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Pr
 
   if (plan.editor) await ensureCommand(plan.editor);
   if (plan.sidebarCommand) await ensureCommand(plan.sidebarCommand);
+  if (plan.secondaryEditor) {
+    const secondaryBin = plan.secondaryEditor.split(" ")[0]!;
+    await ensureCommand(secondaryBin);
+  }
   if (plan.serverCommand) {
     const serverBin = plan.serverCommand.split(" ")[0]!;
     await ensureCommand(serverBin);

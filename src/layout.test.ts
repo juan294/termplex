@@ -102,6 +102,7 @@ describe("layout presets", () => {
     expect(isPresetName("full")).toBe(true);
     expect(isPresetName("pair")).toBe(true);
     expect(isPresetName("cli")).toBe(true);
+    expect(isPresetName("mtop")).toBe(true);
     expect(isPresetName("unknown")).toBe(false);
   });
 
@@ -132,6 +133,14 @@ describe("layout presets", () => {
     expect(plan.rightColumnEditorCount).toBe(0);
     expect(plan.hasServer).toBe(true);
     expect(plan.serverCommand).toBe("npm login");
+  });
+
+  it("mtop preset: 2 editor panes with mtop as secondary editor, server enabled", () => {
+    const plan = planLayout(getPreset("mtop"));
+    expect(plan.leftColumnCount).toBe(1);
+    expect(plan.rightColumnEditorCount).toBe(1);
+    expect(plan.hasServer).toBe(true);
+    expect(plan.secondaryEditor).toBe("mtop");
   });
 
   it("individual keys override preset values", () => {

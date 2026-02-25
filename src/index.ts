@@ -26,7 +26,7 @@ Options:
   -h, --help                    Show this help message
   -v, --version                 Show version number
   -f, --force                   Kill existing session and recreate it
-  -l, --layout <preset>         Use a layout preset (minimal, full, pair, cli)
+  -l, --layout <preset>         Use a layout preset (minimal, full, pair, cli, mtop)
   --editor <cmd>                Override editor command
   --panes <n>                   Override number of editor panes
   --editor-size <n>             Override editor width %
@@ -48,6 +48,7 @@ Layout presets:
   full          3 editor panes + server (default)
   pair          2 editor panes + server
   cli           1 editor pane + server (npm login)
+  mtop          editor + mtop + server + lazygit sidebar
 
 Per-project config:
   Place a .termplex file in your project root with key=value pairs.
