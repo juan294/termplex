@@ -48,6 +48,7 @@ termplex .    (panes=3, editor=claude, sidebar=lazygit, server=true)
 | `pair` | 2 | yes | Two editors + dev server |
 | `minimal` | 1 | no | Simple editor + sidebar only |
 | `cli` | 1 | yes | CLI tool development -- editor + npm login |
+| `mtop` | 2 | yes | System monitoring -- editor + mtop + server |
 
 ```bash
 termplex . --layout minimal       # 1 editor pane, no server
@@ -82,7 +83,7 @@ Config resolution order: **CLI flags > .termplex > machine config > preset > def
 
 | Flag | Description |
 |---|---|
-| `-l, --layout <preset>` | Use a layout preset (`minimal`, `full`, `pair`, `cli`) |
+| `-l, --layout <preset>` | Use a layout preset (`minimal`, `full`, `pair`, `cli`, `mtop`) |
 | `-f, --force` | Kill existing session and recreate it |
 | `--editor <cmd>` | Override editor command |
 | `--panes <n>` | Override number of editor panes |
