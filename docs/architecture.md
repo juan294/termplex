@@ -8,6 +8,7 @@ Technical reference for contributors.
 src/
   index.ts       CLI entry point — parseArgs, subcommand dispatch, CLI overrides
   config.ts      Config file read/write (~/.config/termplex/ and .termplex)
+  completion.ts  Shell completion script generators (bash, zsh, fish — pure functions)
   layout.ts      Layout calculation, presets (pure functions, no side effects)
   launcher.ts    Config resolution, tmux session builder (side-effectful)
   globals.d.ts   Build-time constant declarations (__VERSION__)
@@ -18,13 +19,14 @@ src/
 
 ```
 index.ts
-  ├── config.ts   (addProject, removeProject, getProject, listProjects, setConfig, listConfig)
-  └── launcher.ts (launch, CLIOverrides)
+  ├── config.ts      (addProject, removeProject, getProject, listProjects, setConfig, listConfig)
+  ├── completion.ts  (bashCompletion, zshCompletion, fishCompletion)
+  └── launcher.ts    (launch, CLIOverrides)
         ├── config.ts   (getConfig, readKVFile)
         └── layout.ts   (planLayout, isPresetName, getPreset, LayoutOptions, LayoutPlan)
 ```
 
-`layout.ts` is a pure module with no imports from the project. `config.ts` only uses Node stdlib. `launcher.ts` depends on both.
+`layout.ts` and `completion.ts` are pure modules with no imports from the project. `config.ts` only uses Node stdlib. `launcher.ts` depends on both `config.ts` and `layout.ts`.
 
 ## Data Flow
 
@@ -35,6 +37,7 @@ CLI invocation
       positionals: subcommand + args
   → subcommand dispatch (switch/case)
       ├── add/remove/list/set/config → config.ts read/write
+      ├── completion → completion.ts (outputs shell-specific completion script to stdout)
       └── default (launch target)
             → resolve target directory (., absolute path, or project name lookup)
             → build CLIOverrides from parsed flags

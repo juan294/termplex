@@ -369,6 +369,45 @@ termplex automatically sets the terminal tab title to the project directory name
 
 This works with Ghostty, iTerm2, WezTerm, kitty, and other terminals that support tmux title propagation. termplex configures tmux's `set-titles` option each time it attaches to a session.
 
+## Shell Completion
+
+Enable tab completion for project names, subcommands, flags, and layout presets.
+
+### Setup
+
+Add one line to your shell config, then restart your shell:
+
+**Bash** (`~/.bashrc`):
+```bash
+eval "$(termplex completion bash)"
+```
+
+**Zsh** (`~/.zshrc`):
+```bash
+eval "$(termplex completion zsh)"
+```
+
+**Fish**:
+```bash
+termplex completion fish > ~/.config/fish/completions/termplex.fish
+```
+
+Completions work with both `termplex` and `ws`.
+
+### What Gets Completed
+
+| Context | Completions |
+|---|---|
+| `ws <TAB>` | Subcommands + registered project names + `.` |
+| `ws cod<TAB>` | Matching project names (e.g., `co-pilot-rpi`) |
+| `ws remove <TAB>` | Registered project names |
+| `ws set <TAB>` | Config keys (`editor`, `sidebar`, `panes`, etc.) |
+| `ws set layout <TAB>` | Layout presets |
+| `ws --layout <TAB>` | Layout presets (`minimal`, `full`, `pair`, `cli`, `mtop`) |
+| `ws --<TAB>` | All CLI flags |
+
+Project names are read dynamically from `~/.config/termplex/projects` on each Tab press, so newly added projects are available immediately.
+
 ## The `ws` Alias
 
 termplex ships a second binary name `ws` that behaves identically:
