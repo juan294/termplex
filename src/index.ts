@@ -10,6 +10,7 @@ import {
 } from "./config.js";
 import { launch } from "./launcher.js";
 import type { CLIOverrides } from "./launcher.js";
+import { bashCompletion, zshCompletion, fishCompletion } from "./completion.js";
 
 const HELP = `
 termplex — Launch configurable multi-pane terminal workspaces
@@ -21,6 +22,7 @@ Usage:
   termplex list                 List all registered projects
   termplex set <key> [value]    Set a machine-level config value
   termplex config               Show current machine configuration
+  termplex completion <shell>   Output shell completion script (bash, zsh, fish)
 
 Options:
   -h, --help                    Show this help message
@@ -53,6 +55,11 @@ Layout presets:
 Per-project config:
   Place a .termplex file in your project root with key=value pairs.
   Project config overrides machine config; CLI flags override both.
+
+Shell completion:
+  Bash:  echo 'eval "$(termplex completion bash)"' >> ~/.bashrc
+  Zsh:   echo 'eval "$(termplex completion zsh)"' >> ~/.zshrc
+  Fish:  termplex completion fish > ~/.config/fish/completions/termplex.fish
 
 Examples:
   termplex .                    Launch workspace in current directory
@@ -170,6 +177,25 @@ switch (subcommand) {
     console.log("Machine config:");
     for (const [key, value] of config) {
       console.log(`  ${key} → ${value || "(plain shell)"}`);
+    }
+    break;
+  }
+
+  case "completion": {
+    const [shell] = args;
+    if (!shell || !["bash", "zsh", "fish"].includes(shell)) {
+      console.error("Usage: termplex completion [bash|zsh|fish]");
+      console.error("");
+      console.error("Setup:");
+      console.error(`  Bash:  echo 'eval "$(termplex completion bash)"' >> ~/.bashrc`);
+      console.error(`  Zsh:   echo 'eval "$(termplex completion zsh)"' >> ~/.zshrc`);
+      console.error("  Fish:  termplex completion fish > ~/.config/fish/completions/termplex.fish");
+      process.exit(shell ? 1 : 0);
+    }
+    switch (shell) {
+      case "bash": console.log(bashCompletion()); break;
+      case "zsh":  console.log(zshCompletion()); break;
+      case "fish": console.log(fishCompletion()); break;
     }
     break;
   }
