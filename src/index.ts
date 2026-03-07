@@ -14,6 +14,7 @@ import { bashCompletion, zshCompletion, fishCompletion } from "./completion.js";
 
 const HELP = `
 termplex — Launch configurable multi-pane terminal workspaces
+Aliases: ws
 
 Usage:
   termplex <target>             Launch workspace (project name, path, or '.')
@@ -76,6 +77,7 @@ function showHelp(): void {
 
 const parseOpts = {
   allowPositionals: true,
+  allowNegative: true,
   options: {
     help: { type: "boolean", short: "h" },
     version: { type: "boolean", short: "v" },
@@ -139,8 +141,13 @@ switch (subcommand) {
       console.error("Usage: termplex remove <name>");
       process.exit(1);
     }
-    removeProject(name);
-    console.log(`Removed: ${name}`);
+    const existed = removeProject(name);
+    if (existed) {
+      console.log(`Removed: ${name}`);
+    } else {
+      console.error(`Project not found: ${name}`);
+      process.exit(1);
+    }
     break;
   }
 
@@ -162,6 +169,10 @@ switch (subcommand) {
     if (!key) {
       console.error("Usage: termplex set <key> [value]");
       process.exit(1);
+    }
+    const VALID_KEYS = ["editor", "sidebar", "panes", "editor-size", "server", "mouse", "layout"];
+    if (!VALID_KEYS.includes(key)) {
+      console.warn(`Warning: unknown config key "${key}". Valid keys: ${VALID_KEYS.join(", ")}`);
     }
     setConfig(key, value ?? "");
     if (value) {
