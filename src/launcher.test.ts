@@ -333,6 +333,37 @@ describe("command dependency checks", () => {
     mockExit.mockRestore();
   });
 
+  it("shows correct CLI syntax in error message for unknown command (B2)", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (cmd === "command -v obscure-tool") throw new Error("not found");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockImplementation((key: string) => {
+      if (key === "editor") return "obscure-tool";
+      if (key === "sidebar") return "htop";
+      return undefined;
+    });
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("process.exit");
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(launch("/tmp/workspace")).rejects.toThrow("process.exit");
+
+    // Should say "termplex set editor <command>" not "termplex config set editor <command>"
+    const errorMessages = errorSpy.mock.calls.map((c) => c[0] as string);
+    const configMsg = errorMessages.find((m) => m.includes("termplex"));
+    expect(configMsg).toBeDefined();
+    expect(configMsg).toContain("termplex set editor <command>");
+    expect(configMsg).not.toContain("termplex config set editor");
+
+    mockExit.mockRestore();
+    errorSpy.mockRestore();
+  });
+
   it("skips check when editor config is empty string", async () => {
     mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
       if (typeof cmd === "string" && cmd.startsWith("command -v "))
@@ -383,6 +414,160 @@ describe("command dependency checks", () => {
   });
 });
 
+describe("--force flag", () => {
+  it("kills existing session and creates new one when force=true", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      // has-session succeeds — session exists
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        return opts?.encoding ? "" : Buffer.from("");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    await launch("/tmp/workspace", { force: true });
+
+    const tmuxCalls = mockExecSync.mock.calls.map((c) => c[0] as string);
+    // Should kill existing session
+    expect(tmuxCalls.some((c) => c.includes("kill-session"))).toBe(true);
+    // Should create a new session
+    expect(tmuxCalls.some((c) => c.includes("new-session"))).toBe(true);
+    // Should NOT just reattach
+    const attachBeforeNew = tmuxCalls.indexOf(
+      tmuxCalls.find((c) => c.includes("attach-session"))!,
+    );
+    const newSession = tmuxCalls.indexOf(
+      tmuxCalls.find((c) => c.includes("new-session"))!,
+    );
+    expect(newSession).toBeLessThan(attachBeforeNew);
+  });
+});
+
+describe("secondaryEditor binary check", () => {
+  it("checks secondaryEditor binary when mtop preset is used", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        throw new Error("no session");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    await launch("/tmp/workspace", { layout: "mtop" });
+
+    // Should check for mtop binary
+    expect(mockExecSync).toHaveBeenCalledWith("command -v mtop", {
+      stdio: "ignore",
+    });
+  });
+});
+
+describe("ensureCommand error paths", () => {
+  it("exits when install command throws an error", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string; stdio?: string }) => {
+      if (cmd === "command -v claude") {
+        throw new Error("not found");
+      }
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      // The install command itself throws
+      if (typeof cmd === "string" && cmd.includes("npm install -g"))
+        throw new Error("install failed");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    mockQuestion.mockImplementation((_q: string, cb: (a: string) => void) => {
+      cb("y");
+    });
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("process.exit");
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(launch("/tmp/workspace")).rejects.toThrow("process.exit");
+    expect(mockExit).toHaveBeenCalledWith(1);
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Failed to install `claude`. Please install it manually and try again.",
+    );
+    mockExit.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it("exits when command still not found after successful install", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string; stdio?: string }) => {
+      // command -v claude always fails (even after install)
+      if (cmd === "command -v claude") throw new Error("not found");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      // Install itself succeeds (does not throw)
+      if (typeof cmd === "string" && cmd.includes("npm install -g"))
+        return Buffer.from("");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    mockQuestion.mockImplementation((_q: string, cb: (a: string) => void) => {
+      cb("y");
+    });
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("process.exit");
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(launch("/tmp/workspace")).rejects.toThrow("process.exit");
+    expect(mockExit).toHaveBeenCalledWith(1);
+    expect(errorSpy).toHaveBeenCalledWith(
+      "`claude` still not found after install. Please check your PATH.",
+    );
+    mockExit.mockRestore();
+    errorSpy.mockRestore();
+  });
+});
+
+describe("lazygit install handler", () => {
+  it("offers to install lazygit via brew when missing and brew is available", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string; stdio?: string }) => {
+      if (cmd === "command -v lazygit") throw new Error("not found");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    // After the install, lazygit is found
+    let lazygitCallCount = 0;
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string; stdio?: string }) => {
+      if (cmd === "command -v lazygit") {
+        lazygitCallCount++;
+        if (lazygitCallCount <= 1) throw new Error("not found");
+        return Buffer.from("/usr/bin/lazygit");
+      }
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        return opts?.encoding ? "" : Buffer.from("");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+
+    mockQuestion.mockImplementation((_q: string, cb: (a: string) => void) => {
+      cb("y");
+    });
+
+    await launch("/tmp/workspace");
+
+    expect(mockQuestion).toHaveBeenCalledTimes(1);
+    expect(mockQuestion.mock.calls[0]![0]).toContain("brew install lazygit");
+    expect(mockExecSync).toHaveBeenCalledWith("brew install lazygit", {
+      stdio: "inherit",
+    });
+  });
+});
+
 describe("config resolution", () => {
   it("project config overrides global config", () => {
     vi.mocked(getConfig).mockImplementation((key: string) => {
@@ -421,10 +606,26 @@ describe("config resolution", () => {
 
     const { opts } = resolveConfig("/tmp/workspace", {});
     expect(warnSpy).toHaveBeenCalledWith(
-      'Unknown layout preset: "bogus", using defaults.',
+      'Unknown layout preset: "bogus". Valid presets: minimal, full, pair, cli, mtop. Using defaults.',
     );
     // No preset expansion — opts should have no editorPanes set from preset
     expect(opts.editorPanes).toBeUndefined();
+    warnSpy.mockRestore();
+  });
+
+  it("unknown preset warning lists all valid presets", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockReadKVFile.mockReturnValue(new Map([["layout", "invalid"]]));
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    resolveConfig("/tmp/workspace", {});
+
+    const warnMsg = warnSpy.mock.calls[0]![0] as string;
+    expect(warnMsg).toContain("minimal");
+    expect(warnMsg).toContain("full");
+    expect(warnMsg).toContain("pair");
+    expect(warnMsg).toContain("cli");
+    expect(warnMsg).toContain("mtop");
     warnSpy.mockRestore();
   });
 
@@ -533,5 +734,135 @@ describe("mouse mode", () => {
       .filter((c) => c.startsWith("tmux "));
 
     expect(tmuxCalls.some((c) => c.includes("set-option") && c.includes("mouse off"))).toBe(true);
+  });
+});
+
+describe("input validation (W6)", () => {
+  it("warns and uses default when panes is NaN", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(getConfig).mockReturnValue(undefined);
+    mockReadKVFile.mockReturnValue(new Map());
+
+    const { opts } = resolveConfig("/tmp/workspace", { panes: "abc" });
+    expect(opts.editorPanes).toBe(3);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("warns and uses default when panes is zero", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(getConfig).mockReturnValue(undefined);
+    mockReadKVFile.mockReturnValue(new Map());
+
+    const { opts } = resolveConfig("/tmp/workspace", { panes: "0" });
+    expect(opts.editorPanes).toBe(3);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("warns and uses default when panes is negative", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(getConfig).mockReturnValue(undefined);
+    mockReadKVFile.mockReturnValue(new Map());
+
+    const { opts } = resolveConfig("/tmp/workspace", { panes: "-2" });
+    expect(opts.editorPanes).toBe(3);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("warns and uses default when editorSize is 0", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(getConfig).mockReturnValue(undefined);
+    mockReadKVFile.mockReturnValue(new Map());
+
+    const { opts } = resolveConfig("/tmp/workspace", { "editor-size": "0" });
+    expect(opts.editorSize).toBe(75);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("warns and uses default when editorSize is 150 (out of range)", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(getConfig).mockReturnValue(undefined);
+    mockReadKVFile.mockReturnValue(new Map());
+
+    const { opts } = resolveConfig("/tmp/workspace", { "editor-size": "150" });
+    expect(opts.editorSize).toBe(75);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("warns and uses default when editorSize is NaN", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(getConfig).mockReturnValue(undefined);
+    mockReadKVFile.mockReturnValue(new Map());
+
+    const { opts } = resolveConfig("/tmp/workspace", { "editor-size": "big" });
+    expect(opts.editorSize).toBe(75);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("accepts valid panes value", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(getConfig).mockReturnValue(undefined);
+    mockReadKVFile.mockReturnValue(new Map());
+
+    const { opts } = resolveConfig("/tmp/workspace", { panes: "5" });
+    expect(opts.editorPanes).toBe(5);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("accepts valid editorSize value", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(getConfig).mockReturnValue(undefined);
+    mockReadKVFile.mockReturnValue(new Map());
+
+    const { opts } = resolveConfig("/tmp/workspace", { "editor-size": "60" });
+    expect(opts.editorSize).toBe(60);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+});
+
+describe("tmux install via ensureCommand (W9)", () => {
+  it("uses ensureCommand for tmux (tmux in KNOWN_INSTALL_COMMANDS)", async () => {
+    // tmux not installed, brew available
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string; stdio?: string }) => {
+      if (cmd === "command -v tmux") throw new Error("not found");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    // User accepts install
+    mockQuestion.mockImplementation((_q: string, cb: (a: string) => void) => {
+      cb("y");
+    });
+
+    // After install, tmux is found
+    let tmuxCallCount = 0;
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string; stdio?: string }) => {
+      if (cmd === "command -v tmux") {
+        tmuxCallCount++;
+        if (tmuxCallCount <= 1) throw new Error("not found");
+        return Buffer.from("/usr/bin/tmux");
+      }
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        return opts?.encoding ? "" : Buffer.from("");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+
+    await launch("/tmp/workspace");
+
+    // Should have offered brew install tmux (on macOS)
+    expect(mockQuestion).toHaveBeenCalledTimes(1);
+    const promptText = mockQuestion.mock.calls[0]![0] as string;
+    expect(promptText).toContain("tmux");
   });
 });
