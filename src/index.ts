@@ -10,9 +10,11 @@ import {
 } from "./config.js";
 import { launch } from "./launcher.js";
 import type { CLIOverrides } from "./launcher.js";
+import { bashCompletion, zshCompletion, fishCompletion } from "./completion.js";
 
 const HELP = `
 termplex — Launch configurable multi-pane terminal workspaces
+Aliases: ws
 
 Usage:
   termplex <target>             Launch workspace (project name, path, or '.')
@@ -21,6 +23,7 @@ Usage:
   termplex list                 List all registered projects
   termplex set <key> [value]    Set a machine-level config value
   termplex config               Show current machine configuration
+  termplex completion <shell>   Output shell completion script (bash, zsh, fish)
 
 Options:
   -h, --help                    Show this help message
@@ -54,6 +57,11 @@ Per-project config:
   Place a .termplex file in your project root with key=value pairs.
   Project config overrides machine config; CLI flags override both.
 
+Shell completion:
+  Bash:  echo 'eval "$(termplex completion bash)"' >> ~/.bashrc
+  Zsh:   echo 'eval "$(termplex completion zsh)"' >> ~/.zshrc
+  Fish:  termplex completion fish > ~/.config/fish/completions/termplex.fish
+
 Examples:
   termplex .                    Launch workspace in current directory
   termplex myapp                Launch workspace for registered project
@@ -69,6 +77,7 @@ function showHelp(): void {
 
 const parseOpts = {
   allowPositionals: true,
+  allowNegative: true,
   options: {
     help: { type: "boolean", short: "h" },
     version: { type: "boolean", short: "v" },
@@ -132,8 +141,13 @@ switch (subcommand) {
       console.error("Usage: termplex remove <name>");
       process.exit(1);
     }
-    removeProject(name);
-    console.log(`Removed: ${name}`);
+    const existed = removeProject(name);
+    if (existed) {
+      console.log(`Removed: ${name}`);
+    } else {
+      console.error(`Project not found: ${name}`);
+      process.exit(1);
+    }
     break;
   }
 
@@ -156,6 +170,10 @@ switch (subcommand) {
       console.error("Usage: termplex set <key> [value]");
       process.exit(1);
     }
+    const VALID_KEYS = ["editor", "sidebar", "panes", "editor-size", "server", "mouse", "layout"];
+    if (!VALID_KEYS.includes(key)) {
+      console.warn(`Warning: unknown config key "${key}". Valid keys: ${VALID_KEYS.join(", ")}`);
+    }
     setConfig(key, value ?? "");
     if (value) {
       console.log(`Set ${key} → ${value}`);
@@ -170,6 +188,25 @@ switch (subcommand) {
     console.log("Machine config:");
     for (const [key, value] of config) {
       console.log(`  ${key} → ${value || "(plain shell)"}`);
+    }
+    break;
+  }
+
+  case "completion": {
+    const [shell] = args;
+    if (!shell || !["bash", "zsh", "fish"].includes(shell)) {
+      console.error("Usage: termplex completion [bash|zsh|fish]");
+      console.error("");
+      console.error("Setup:");
+      console.error(`  Bash:  echo 'eval "$(termplex completion bash)"' >> ~/.bashrc`);
+      console.error(`  Zsh:   echo 'eval "$(termplex completion zsh)"' >> ~/.zshrc`);
+      console.error("  Fish:  termplex completion fish > ~/.config/fish/completions/termplex.fish");
+      process.exit(shell ? 1 : 0);
+    }
+    switch (shell) {
+      case "bash": console.log(bashCompletion()); break;
+      case "zsh":  console.log(zshCompletion()); break;
+      case "fish": console.log(fishCompletion()); break;
     }
     break;
   }

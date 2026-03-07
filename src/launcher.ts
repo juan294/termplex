@@ -52,36 +52,6 @@ function isCommandInstalled(cmd: string): boolean {
   }
 }
 
-function getInstallCommand(): string | null {
-  if (process.platform === "darwin") {
-    try {
-      execSync("command -v brew", { stdio: "ignore" });
-      return "brew install tmux";
-    } catch {
-      return null;
-    }
-  }
-
-  if (process.platform === "linux") {
-    const managers: [string, string][] = [
-      ["apt-get", "sudo apt-get install -y tmux"],
-      ["dnf", "sudo dnf install -y tmux"],
-      ["yum", "sudo yum install -y tmux"],
-      ["pacman", "sudo pacman -S --noconfirm tmux"],
-    ];
-    for (const [bin, cmd] of managers) {
-      try {
-        execSync(`command -v ${bin}`, { stdio: "ignore" });
-        return cmd;
-      } catch {
-        // try next
-      }
-    }
-  }
-
-  return null;
-}
-
 function prompt(question: string): Promise<string> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
@@ -95,7 +65,7 @@ function prompt(question: string): Promise<string> {
 const KNOWN_INSTALL_COMMANDS: Record<string, () => string | null> = {
   claude: () => "npm install -g @anthropic-ai/claude-code",
   lazygit: () => {
-    if (process.platform === "darwin") {
+    if (process.platform === "darwin" || process.platform === "linux") {
       try {
         execSync("command -v brew", { stdio: "ignore" });
         return "brew install lazygit";
@@ -103,12 +73,31 @@ const KNOWN_INSTALL_COMMANDS: Record<string, () => string | null> = {
         return null;
       }
     }
-    if (process.platform === "linux") {
+    return null;
+  },
+  tmux: () => {
+    if (process.platform === "darwin") {
       try {
         execSync("command -v brew", { stdio: "ignore" });
-        return "brew install lazygit";
+        return "brew install tmux";
       } catch {
         return null;
+      }
+    }
+    if (process.platform === "linux") {
+      const managers: [string, string][] = [
+        ["apt-get", "sudo apt-get install -y tmux"],
+        ["dnf", "sudo dnf install -y tmux"],
+        ["yum", "sudo yum install -y tmux"],
+        ["pacman", "sudo pacman -S --noconfirm tmux"],
+      ];
+      for (const [bin, cmd] of managers) {
+        try {
+          execSync(`command -v ${bin}`, { stdio: "ignore" });
+          return cmd;
+        } catch {
+          // try next
+        }
       }
     }
     return null;
@@ -126,7 +115,7 @@ async function ensureCommand(cmd: string): Promise<void> {
       `\`${cmd}\` is required but not installed, and no known install method was found.`,
     );
     console.error(
-      `Please install \`${cmd}\` manually or change your config with: termplex config set editor <command>`,
+      `Please install \`${cmd}\` manually or change your config with: termplex set editor <command>`,
     );
     process.exit(1);
   }
@@ -157,44 +146,6 @@ async function ensureCommand(cmd: string): Promise<void> {
   console.log(`\`${cmd}\` installed successfully!\n`);
 }
 
-async function ensureTmux(): Promise<void> {
-  if (isCommandInstalled("tmux")) return;
-
-  const installCmd = getInstallCommand();
-  if (!installCmd) {
-    console.error(
-      "tmux is required but not installed, and no supported package manager was found.",
-    );
-    console.error("Please install tmux manually and try again.");
-    process.exit(1);
-  }
-
-  console.log("tmux is required but not installed on this machine.");
-  const answer = await prompt(`Install it now with \`${installCmd}\`? [Y/n] `);
-
-  if (answer && answer !== "y" && answer !== "yes") {
-    console.log("tmux is required for termplex to work. Exiting.");
-    process.exit(1);
-  }
-
-  console.log(`Running: ${installCmd}`);
-  try {
-    execSync(installCmd, { stdio: "inherit" });
-  } catch {
-    console.error(
-      "Failed to install tmux. Please install it manually and try again.",
-    );
-    process.exit(1);
-  }
-
-  if (!isCommandInstalled("tmux")) {
-    console.error("tmux still not found after install. Please check your PATH.");
-    process.exit(1);
-  }
-
-  console.log("tmux installed successfully!\n");
-}
-
 export interface ResolvedConfig {
   opts: Partial<LayoutOptions>;
   mouse: boolean;
@@ -210,7 +161,7 @@ export function resolveConfig(targetDir: string, cliOverrides: CLIOverrides): Re
     if (isPresetName(layoutKey)) {
       base = getPreset(layoutKey);
     } else {
-      console.warn(`Unknown layout preset: "${layoutKey}", using defaults.`);
+      console.warn(`Unknown layout preset: "${layoutKey}". Valid presets: minimal, full, pair, cli, mtop. Using defaults.`);
     }
   }
 
@@ -230,8 +181,24 @@ export function resolveConfig(targetDir: string, cliOverrides: CLIOverrides): Re
   const result: Partial<LayoutOptions> = { ...base };
   if (editor !== undefined) result.editor = editor;
   if (sidebar !== undefined) result.sidebarCommand = sidebar;
-  if (panes !== undefined) result.editorPanes = parseInt(panes, 10);
-  if (editorSize !== undefined) result.editorSize = parseInt(editorSize, 10);
+  if (panes !== undefined) {
+    const parsed = parseInt(panes, 10);
+    if (Number.isNaN(parsed) || parsed < 1) {
+      console.warn(`Invalid panes value: "${panes}". Must be a positive integer. Using default (3).`);
+      result.editorPanes = 3;
+    } else {
+      result.editorPanes = parsed;
+    }
+  }
+  if (editorSize !== undefined) {
+    const parsed = parseInt(editorSize, 10);
+    if (Number.isNaN(parsed) || parsed < 1 || parsed > 99) {
+      console.warn(`Invalid editor-size value: "${editorSize}". Must be 1-99. Using default (75).`);
+      result.editorSize = 75;
+    } else {
+      result.editorSize = parsed;
+    }
+  }
   if (server !== undefined) result.server = server;
 
   return { opts: result, mouse };
@@ -306,7 +273,7 @@ export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Pr
     process.exit(1);
   }
 
-  await ensureTmux();
+  await ensureCommand("tmux");
 
   const { opts, mouse } = resolveConfig(targetDir, cliOverrides ?? {});
   const plan = planLayout(opts);
