@@ -55,8 +55,14 @@ describe("project CRUD", () => {
 
   it("removes a project", () => {
     addProject("myapp", "/home/user/myapp");
-    removeProject("myapp");
+    const result = removeProject("myapp");
+    expect(result).toBe(true);
     expect(getProject("myapp")).toBeUndefined();
+  });
+
+  it("returns false when removing non-existent project", () => {
+    const result = removeProject("ghost");
+    expect(result).toBe(false);
   });
 
   it("overwrites existing project path", () => {

@@ -12,25 +12,6 @@ function ensureConfig(): void {
   if (!existsSync(CONFIG_FILE)) writeFileSync(CONFIG_FILE, "editor=claude\n");
 }
 
-function readKV(file: string): Map<string, string> {
-  ensureConfig();
-  const map = new Map<string, string>();
-  if (!existsSync(file)) return map;
-  const content = readFileSync(file, "utf-8").trim();
-  if (!content) return map;
-  for (const line of content.split("\n")) {
-    const idx = line.indexOf("=");
-    if (idx === -1) continue;
-    map.set(line.slice(0, idx), line.slice(idx + 1));
-  }
-  return map;
-}
-
-function writeKV(file: string, map: Map<string, string>): void {
-  const lines = [...map.entries()].map(([k, v]) => `${k}=${v}`);
-  writeFileSync(file, lines.join("\n") + "\n");
-}
-
 // --- Per-project config ---
 
 export function readKVFile(path: string): Map<string, string> {
@@ -46,6 +27,16 @@ export function readKVFile(path: string): Map<string, string> {
   return map;
 }
 
+function readKV(file: string): Map<string, string> {
+  ensureConfig();
+  return readKVFile(file);
+}
+
+function writeKV(file: string, map: Map<string, string>): void {
+  const lines = [...map.entries()].map(([k, v]) => `${k}=${v}`);
+  writeFileSync(file, lines.join("\n") + "\n");
+}
+
 // --- Projects ---
 
 export function addProject(name: string, path: string): void {
@@ -54,10 +45,11 @@ export function addProject(name: string, path: string): void {
   writeKV(PROJECTS_FILE, projects);
 }
 
-export function removeProject(name: string): void {
+export function removeProject(name: string): boolean {
   const projects = readKV(PROJECTS_FILE);
-  projects.delete(name);
+  const existed = projects.delete(name);
   writeKV(PROJECTS_FILE, projects);
+  return existed;
 }
 
 export function getProject(name: string): string | undefined {
