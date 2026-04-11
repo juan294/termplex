@@ -28,13 +28,13 @@ Tracking what's done and what's left before the first `npm publish`.
 ```bash
 pnpm pack
 # Inspect the tarball contents:
-tar tzf termplex-0.1.8.tgz
+tar tzf termplex-0.1.9.tgz
 # Should contain: package/dist/index.js, package/package.json,
 #                 package/README.md, package/LICENSE
 # Should NOT contain: docs/, src/, node_modules/
 
 # Install globally from the tarball:
-npm i -g ./termplex-0.1.8.tgz
+npm i -g ./termplex-0.1.9.tgz
 
 # Verify both commands work:
 termplex --version
@@ -46,7 +46,7 @@ termplex .
 
 # Clean up:
 npm uninstall -g termplex
-rm termplex-0.1.8.tgz
+rm termplex-0.1.9.tgz
 ```
 
 ### 4. Clean Machine Test
@@ -55,7 +55,7 @@ rm termplex-0.1.8.tgz
 - [ ] Verify the full launch flow
 
 ### 5. Version Strategy
-- `0.x.y` while pre-stable (current: `0.1.8`)
+- `0.x.y` while pre-stable (current: `0.1.9`)
 - `1.0.0` when the CLI is stable and API won't change
 - Follow semver: breaking changes = major, features = minor, fixes = patch
 
@@ -81,8 +81,8 @@ termplex .
 ```
 
 ### 8. GitHub Release
-- [ ] Tag the commit: `git tag v0.1.8`
-- [ ] Push the tag: `git push origin v0.1.8`
+- [ ] Tag the commit: `git tag v0.1.9`
+- [ ] Push the tag: `git push origin v0.1.9`
 - [ ] Create a GitHub release from the tag
 
 ## Ongoing Release Process
