@@ -13,6 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CHANGELOG.md
 - GitHub issue templates (bug report, feature request)
 - Pull request template
+- Architecture diagram (`docs/termplex-architecture.drawio`)
+
+### Changed
+
+- CI test matrix updated to Node 20 and 22; `engines` bumped to `>=20`
+  (Node 18 reached EOL April 2025)
+- Test coverage raised to 100% statements, functions, and lines across all modules
+- Dependency updates: vitest v3→v4, eslint, @types/node, typescript-eslint
+
+### Security
+
+- Fixed flatted DoS vulnerability (Dependabot)
+- Fixed 6 additional high/moderate-severity Dependabot alerts
+  (rollup, esbuild, vite, and related transitive deps)
+- Added pnpm overrides for `rollup >=4.59.0` and `flatted >=3.4.0`
 
 ## [0.1.8] - 2026-03-10
 
@@ -34,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auto-install prompts for missing commands (tmux, claude, lazygit)
 - CLI flags: `--layout`, `--force`, `--editor`, `--panes`, `--editor-size`, `--sidebar`, `--server`, `--mouse`/`--no-mouse`
 - Config resolution order: CLI > project > machine > preset > defaults
-- CI pipeline with Node 18/20/22 matrix
+- CI pipeline with multi-node matrix
 - Dependabot for npm and GitHub Actions
 
 [Unreleased]: https://github.com/juan294/termplex/compare/v0.1.8...HEAD

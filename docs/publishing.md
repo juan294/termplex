@@ -7,7 +7,7 @@ Tracking what's done and what's left before the first `npm publish`.
 - [x] Package name `termplex` available on npm
 - [x] `bin` entries for `termplex` and `ws`
 - [x] `files: ["dist"]` limits published contents
-- [x] `engines: { "node": ">=18" }`
+- [x] `engines: { "node": ">=20" }`
 - [x] `prepublishOnly` runs `pnpm run build`
 - [x] `license: "MIT"` + LICENSE file
 - [x] Zero runtime dependencies
@@ -28,13 +28,13 @@ Tracking what's done and what's left before the first `npm publish`.
 ```bash
 pnpm pack
 # Inspect the tarball contents:
-tar tzf termplex-0.1.0.tgz
+tar tzf termplex-0.1.8.tgz
 # Should contain: package/dist/index.js, package/package.json,
 #                 package/README.md, package/LICENSE
 # Should NOT contain: docs/, src/, node_modules/
 
 # Install globally from the tarball:
-npm i -g ./termplex-0.1.0.tgz
+npm i -g ./termplex-0.1.8.tgz
 
 # Verify both commands work:
 termplex --version
@@ -46,7 +46,7 @@ termplex .
 
 # Clean up:
 npm uninstall -g termplex
-rm termplex-0.1.0.tgz
+rm termplex-0.1.8.tgz
 ```
 
 ### 4. Clean Machine Test
@@ -55,7 +55,7 @@ rm termplex-0.1.0.tgz
 - [ ] Verify the full launch flow
 
 ### 5. Version Strategy
-- `0.x.y` while pre-stable (current: `0.1.0`)
+- `0.x.y` while pre-stable (current: `0.1.8`)
 - `1.0.0` when the CLI is stable and API won't change
 - Follow semver: breaking changes = major, features = minor, fixes = patch
 
@@ -81,8 +81,8 @@ termplex .
 ```
 
 ### 8. GitHub Release
-- [ ] Tag the commit: `git tag v0.1.0`
-- [ ] Push the tag: `git push origin v0.1.0`
+- [ ] Tag the commit: `git tag v0.1.8`
+- [ ] Push the tag: `git push origin v0.1.8`
 - [ ] Create a GitHub release from the tag
 
 ## Ongoing Release Process
@@ -113,7 +113,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           registry-url: https://registry.npmjs.org
       - run: corepack enable && pnpm install
       - run: pnpm test
