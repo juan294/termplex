@@ -414,6 +414,149 @@ describe("command dependency checks", () => {
   });
 });
 
+describe("KNOWN_INSTALL_COMMANDS — install hint generation", () => {
+  function setPlatform(value: string) {
+    Object.defineProperty(process, "platform", { value, configurable: true });
+  }
+
+  it("lazygit: returns null and exits when brew is not available", async () => {
+    setPlatform("darwin");
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (cmd === "command -v lazygit") throw new Error("not found");
+      if (cmd === "command -v brew") throw new Error("not found");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("process.exit");
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await expect(launch("/tmp/workspace")).rejects.toThrow("process.exit");
+      expect(mockExit).toHaveBeenCalledWith(1);
+    } finally {
+      mockExit.mockRestore();
+      setPlatform(process.platform); // restore (already darwin on dev, but defensive)
+    }
+  });
+
+  it("lazygit: returns null on non-darwin/linux platform", async () => {
+    const origPlatform = process.platform;
+    setPlatform("win32");
+
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (cmd === "command -v lazygit") throw new Error("not found");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("process.exit");
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await expect(launch("/tmp/workspace")).rejects.toThrow("process.exit");
+      expect(mockExit).toHaveBeenCalledWith(1);
+    } finally {
+      mockExit.mockRestore();
+      setPlatform(origPlatform);
+    }
+  });
+
+  it("tmux: returns null and exits when brew is not available (darwin)", async () => {
+    const origPlatform = process.platform;
+    setPlatform("darwin");
+
+    mockExecSync.mockImplementation((cmd: string) => {
+      if (cmd === "command -v tmux") throw new Error("not found");
+      if (cmd === "command -v brew") throw new Error("not found");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      return Buffer.from("");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("process.exit");
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await expect(launch("/tmp/workspace")).rejects.toThrow("process.exit");
+      expect(mockExit).toHaveBeenCalledWith(1);
+    } finally {
+      mockExit.mockRestore();
+      setPlatform(origPlatform);
+    }
+  });
+
+  it("tmux: returns apt-get install command on linux when apt-get is available", async () => {
+    const origPlatform = process.platform;
+    setPlatform("linux");
+
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (cmd === "command -v tmux") throw new Error("not found");
+      if (cmd === "command -v apt-get") return Buffer.from("/usr/bin/apt-get");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    // User declines install
+    mockQuestion.mockImplementation((_q: string, cb: (a: string) => void) => {
+      cb("n");
+    });
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("process.exit");
+    });
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    try {
+      await expect(launch("/tmp/workspace")).rejects.toThrow("process.exit");
+      expect(mockExit).toHaveBeenCalledWith(1);
+      expect(mockQuestion.mock.calls[0]?.[0]).toContain("apt-get");
+    } finally {
+      mockExit.mockRestore();
+      setPlatform(origPlatform);
+    }
+  });
+
+  it("tmux: returns null and exits when no package manager found on linux", async () => {
+    const origPlatform = process.platform;
+    setPlatform("linux");
+
+    mockExecSync.mockImplementation((cmd: string) => {
+      // tmux not installed, and no package managers available
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        throw new Error("not found");
+      return Buffer.from("");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("process.exit");
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await expect(launch("/tmp/workspace")).rejects.toThrow("process.exit");
+      expect(mockExit).toHaveBeenCalledWith(1);
+    } finally {
+      mockExit.mockRestore();
+      setPlatform(origPlatform);
+    }
+  });
+});
+
 describe("--force flag", () => {
   it("kills existing session and creates new one when force=true", async () => {
     mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
