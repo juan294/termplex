@@ -22,3 +22,7 @@ node_modules 2
 .npmrc
 *.pem
 *.key
+
+# Internal/private files
+.summon
+docs/research/

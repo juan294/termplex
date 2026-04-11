@@ -115,4 +115,14 @@ describe("readKVFile", () => {
     const map = readKVFile("/nonexistent/.termplex");
     expect(map.size).toBe(0);
   });
+
+  it("skips lines that have no '=' character", async () => {
+    const store = await getStore();
+    store.set("/tmp/.termplex-comments", "# comment\neditor=vim\nno-equals-here\npanes=2\n");
+    const map = readKVFile("/tmp/.termplex-comments");
+    expect(map.get("editor")).toBe("vim");
+    expect(map.get("panes")).toBe("2");
+    expect(map.has("# comment")).toBe(false);
+    expect(map.has("no-equals-here")).toBe(false);
+  });
 });
