@@ -49,7 +49,7 @@
     ],
     "overrides": {
       "rollup": ">=4.59.0",
-      "flatted": ">=3.4.0"
+      "flatted": ">=3.4.2"
     }
   },
   "devDependencies": {
