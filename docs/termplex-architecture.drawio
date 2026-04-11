@@ -1,0 +1,168 @@
+<mxGraphModel adaptiveColors="auto" dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900">
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+    <mxCell id="title" value="Termplex Architecture" style="text;html=1;fontSize=22;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+      <mxGeometry x="440" y="20" width="400" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="subtitle" value="CLI tool for configurable multi-pane terminal workspaces" style="text;html=1;fontSize=12;fontStyle=2;align=center;verticalAlign=middle;whiteSpace=wrap;fillColor=none;strokeColor=none;fontColor=#888888;" vertex="1" parent="1">
+      <mxGeometry x="440" y="55" width="400" height="25" as="geometry"/>
+    </mxCell>
+    <mxCell id="swim_cli" value="CLI Interface" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;arcSize=8;fontStyle=1;fontSize=13;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
+      <mxGeometry x="40" y="100" width="240" height="280" as="geometry"/>
+    </mxCell>
+    <mxCell id="cli_index" value="index.ts&lt;br&gt;&lt;i style=&quot;font-size:10px;&quot;&gt;Entry point &amp;amp; arg parser&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="swim_cli">
+      <mxGeometry x="30" y="45" width="180" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="cli_launch" value="launch" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="swim_cli">
+      <mxGeometry x="30" y="110" width="80" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="cli_project" value="add / remove&lt;br&gt;project" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="swim_cli">
+      <mxGeometry x="125" y="110" width="85" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="cli_config" value="config mgmt" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="swim_cli">
+      <mxGeometry x="30" y="160" width="80" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="cli_help" value="help / version" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="swim_cli">
+      <mxGeometry x="125" y="160" width="85" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="cli_parseargs" value="parseArgs (Node.js stdlib)" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;dashed=1;" vertex="1" parent="swim_cli">
+      <mxGeometry x="30" y="215" width="180" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="swim_config" value="Config" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;arcSize=8;fontStyle=1;fontSize=13;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
+      <mxGeometry x="340" y="100" width="240" height="280" as="geometry"/>
+    </mxCell>
+    <mxCell id="config_main" value="config.ts&lt;br&gt;&lt;i style=&quot;font-size:10px;&quot;&gt;Config management&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="swim_config">
+      <mxGeometry x="30" y="45" width="180" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="config_global" value="~/.config/termplex/&lt;br&gt;&lt;i style=&quot;font-size:10px;&quot;&gt;projects registry&lt;br&gt;machine settings&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="swim_config">
+      <mxGeometry x="20" y="115" width="110" height="65" as="geometry"/>
+    </mxCell>
+    <mxCell id="config_local" value=".termplex&lt;br&gt;&lt;i style=&quot;font-size:10px;&quot;&gt;per-project&lt;br&gt;overrides&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="swim_config">
+      <mxGeometry x="145" y="115" width="80" height="65" as="geometry"/>
+    </mxCell>
+    <mxCell id="config_format" value="Key-value file format" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;dashed=1;" vertex="1" parent="swim_config">
+      <mxGeometry x="30" y="210" width="180" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="swim_layout" value="Layout Planning" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;arcSize=8;fontStyle=1;fontSize=13;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
+      <mxGeometry x="640" y="100" width="240" height="280" as="geometry"/>
+    </mxCell>
+    <mxCell id="layout_main" value="layout.ts&lt;br&gt;&lt;i style=&quot;font-size:10px;&quot;&gt;Pure layout calculation&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="swim_layout">
+      <mxGeometry x="30" y="45" width="180" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="layout_opts" value="Layout Options" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="swim_layout">
+      <mxGeometry x="30" y="115" width="85" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="layout_plan" value="LayoutPlan" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="swim_layout">
+      <mxGeometry x="130" y="115" width="80" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="layout_presets" value="Presets: minimal | full | pair | cli | mtop" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;dashed=1;" vertex="1" parent="swim_layout">
+      <mxGeometry x="15" y="170" width="210" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="swim_launcher" value="Launcher" style="swimlane;startSize=30;fillColor=#fce5cd;strokeColor=#d79b00;rounded=1;arcSize=8;fontStyle=1;fontSize=13;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
+      <mxGeometry x="940" y="100" width="240" height="280" as="geometry"/>
+    </mxCell>
+    <mxCell id="launcher_main" value="launcher.ts&lt;br&gt;&lt;i style=&quot;font-size:10px;&quot;&gt;tmux session builder&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#fce5cd;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="swim_launcher">
+      <mxGeometry x="30" y="45" width="180" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="launcher_split" value="Pane splitting" style="rounded=1;whiteSpace=wrap;fillColor=#fce5cd;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="swim_launcher">
+      <mxGeometry x="30" y="115" width="85" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="launcher_session" value="Session mgmt" style="rounded=1;whiteSpace=wrap;fillColor=#fce5cd;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="swim_launcher">
+      <mxGeometry x="130" y="115" width="85" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="launcher_install" value="tmux auto-install" style="rounded=1;whiteSpace=wrap;fillColor=#fce5cd;strokeColor=#d79b00;fontSize=10;dashed=1;" vertex="1" parent="swim_launcher">
+      <mxGeometry x="30" y="170" width="180" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="swim_external" value="External" style="swimlane;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;rounded=1;arcSize=8;fontStyle=1;fontSize=13;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
+      <mxGeometry x="540" y="460" width="400" height="170" as="geometry"/>
+    </mxCell>
+    <mxCell id="ext_tmux" value="tmux&lt;br&gt;&lt;i style=&quot;font-size:10px;&quot;&gt;auto-installed&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="swim_external">
+      <mxGeometry x="30" y="45" width="100" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="ext_lazygit" value="lazygit&lt;br&gt;&lt;i style=&quot;font-size:10px;&quot;&gt;default sidebar&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="swim_external">
+      <mxGeometry x="150" y="45" width="100" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="ext_editor" value="User editor&lt;br&gt;&lt;i style=&quot;font-size:10px;&quot;&gt;nvim / code / etc&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="swim_external">
+      <mxGeometry x="270" y="45" width="110" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="ext_shell" value="Shell completions (bash / zsh / fish)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;dashed=1;" vertex="1" parent="swim_external">
+      <mxGeometry x="30" y="110" width="340" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="swim_completion" value="Completion" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=1;arcSize=8;fontStyle=1;fontSize=13;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
+      <mxGeometry x="40" y="460" width="240" height="130" as="geometry"/>
+    </mxCell>
+    <mxCell id="completion_main" value="completion.ts&lt;br&gt;&lt;i style=&quot;font-size:10px;&quot;&gt;Shell completion scripts&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="swim_completion">
+      <mxGeometry x="30" y="45" width="180" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="edge_cli_config" value="" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;strokeColor=#d6b656;" edge="1" source="cli_index" target="config_main" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="edge_cli_layout" value="" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;strokeColor=#82b366;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="cli_launch" target="layout_main" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="310" y="228"/>
+          <mxPoint x="310" y="90"/>
+          <mxPoint x="760" y="90"/>
+          <mxPoint x="760" y="170"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="edge_config_layout" value="" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;strokeColor=#6c8ebf;" edge="1" source="config_main" target="layout_main" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="edge_layout_launcher" value="" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;strokeColor=#82b366;" edge="1" source="layout_main" target="launcher_main" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="edge_launcher_tmux" value="" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;strokeColor=#d79b00;" edge="1" source="launcher_main" target="ext_tmux" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1060" y="420"/>
+          <mxPoint x="620" y="420"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="edge_launcher_lazygit" value="" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;strokeColor=#d79b00;" edge="1" source="launcher_session" target="ext_lazygit" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1113" y="430"/>
+          <mxPoint x="740" y="430"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="edge_launcher_editor" value="" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;strokeColor=#d79b00;" edge="1" source="launcher_session" target="ext_editor" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1113" y="440"/>
+          <mxPoint x="865" y="440"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="edge_cli_completion" value="" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;strokeColor=#9673a6;dashed=1;" edge="1" source="cli_index" target="completion_main" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="160" y="410"/>
+          <mxPoint x="160" y="530"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="edge_completion_ext" value="" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;strokeColor=#9673a6;dashed=1;" edge="1" source="completion_main" target="ext_shell" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="label_flow1" value="args" style="text;html=1;fontSize=10;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;fontColor=#888888;" vertex="1" parent="1">
+      <mxGeometry x="290" y="125" width="40" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="label_flow2" value="options" style="text;html=1;fontSize=10;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;fontColor=#888888;" vertex="1" parent="1">
+      <mxGeometry x="590" y="125" width="40" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="label_flow3" value="LayoutPlan" style="text;html=1;fontSize=10;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;fontColor=#888888;" vertex="1" parent="1">
+      <mxGeometry x="890" y="125" width="60" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="label_flow4" value="tmux cmds" style="text;html=1;fontSize=10;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;fontColor=#888888;" vertex="1" parent="1">
+      <mxGeometry x="1070" y="400" width="60" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="tech_badge" value="Node.js &amp;gt;= 18 (ESM) | TypeScript 5.7 | Zero runtime deps" style="text;html=1;fontSize=10;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;fontColor=#999999;fontStyle=2;" vertex="1" parent="1">
+      <mxGeometry x="420" y="660" width="440" height="20" as="geometry"/>
+    </mxCell>
+  </root>
+</mxGraphModel>
