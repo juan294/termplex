@@ -65,24 +65,14 @@ function prompt(question: string): Promise<string> {
 const KNOWN_INSTALL_COMMANDS: Record<string, () => string | null> = {
   claude: () => "npm install -g @anthropic-ai/claude-code",
   lazygit: () => {
-    if (process.platform === "darwin" || process.platform === "linux") {
-      try {
-        execSync("command -v brew", { stdio: "ignore" });
-        return "brew install lazygit";
-      } catch {
-        return null;
-      }
+    if ((process.platform === "darwin" || process.platform === "linux") && isCommandInstalled("brew")) {
+      return "brew install lazygit";
     }
     return null;
   },
   tmux: () => {
     if (process.platform === "darwin") {
-      try {
-        execSync("command -v brew", { stdio: "ignore" });
-        return "brew install tmux";
-      } catch {
-        return null;
-      }
+      return isCommandInstalled("brew") ? "brew install tmux" : null;
     }
     if (process.platform === "linux") {
       const managers: [string, string][] = [
@@ -130,6 +120,7 @@ async function ensureCommand(cmd: string): Promise<void> {
 
   console.log(`Running: ${installCmd}`);
   try {
+    // installCmd comes from KNOWN_INSTALL_COMMANDS — same trust model as Makefile or .envrc.
     execSync(installCmd, { stdio: "inherit" });
   } catch {
     console.error(
