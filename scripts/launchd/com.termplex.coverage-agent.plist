@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.termplex.coverage-agent</string>
+
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>/Users/juan/code/termplex/scripts/coverage-agent.sh</string>
+	</array>
+
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>4</integer>
+		<key>Minute</key>
+		<integer>45</integer>
+	</dict>
+
+	<key>StandardOutPath</key>
+	<string>/Users/juan/code/termplex/logs/coverage-agent.log</string>
+
+	<key>StandardErrorPath</key>
+	<string>/Users/juan/code/termplex/logs/coverage-agent.error.log</string>
+
+	<key>WorkingDirectory</key>
+	<string>/Users/juan/code/termplex</string>
+
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HOME</key>
+		<string>/Users/juan</string>
+		<key>PATH</key>
+		<string>/Users/juan/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+</dict>
+</plist>
