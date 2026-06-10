@@ -26,3 +26,5 @@ node_modules 2
 # Internal/private files
 .summon
 docs/research/
+docs/agents/
+scripts/agents/
