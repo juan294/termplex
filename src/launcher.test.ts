@@ -141,6 +141,109 @@ describe("buildSession", () => {
     expect(tmuxCalls.some((c) => c.includes("attach-session"))).toBe(true);
     expect(tmuxCalls.some((c) => c.includes("new-session"))).toBe(false);
   });
+
+  it("skips respawn-pane when editor is empty string", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        throw new Error("no session");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    await launch("/tmp/workspace", { editor: "" });
+
+    const tmuxCalls = mockExecSync.mock.calls
+      .map((c) => c[0] as string)
+      .filter((c) => c.startsWith("tmux "));
+    expect(tmuxCalls.some((c) => c.includes("respawn-pane"))).toBe(false);
+  });
+
+  it("creates sidebar with plain shell when sidebar is empty string", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        throw new Error("no session");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    await launch("/tmp/workspace", { sidebar: "" });
+
+    // sidebar="" → sidebarCommand="" (falsy) → splitPane called with undefined (plain shell)
+    const tmuxCalls = mockExecSync.mock.calls
+      .map((c) => c[0] as string)
+      .filter((c) => c.startsWith("tmux "));
+    expect(tmuxCalls.some((c) => c.includes("split-window"))).toBe(true);
+  });
+
+  it("uses secondaryEditor in right-col loop panes before server when layout=mtop and panes=4", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        throw new Error("no session");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    await launch("/tmp/workspace", { layout: "mtop", panes: "4" });
+
+    // mtop+panes=4: secondaryEditor="mtop", rightColumnEditorCount=2, totalRight=3
+    // right-col loop i=1: isServer=false → cmd=secondaryEditor("mtop") (left side of ??)
+    const tmuxCalls = mockExecSync.mock.calls
+      .map((c) => c[0] as string)
+      .filter((c) => c.startsWith("tmux "));
+    const splits = tmuxCalls.filter((c) => c.includes("split-window"));
+    expect(splits.length).toBe(5);
+    expect(splits.some((c) => c.includes("mtop"))).toBe(true);
+  });
+
+  it("adds secondary editor panes to right column before server when panes=4", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        throw new Error("no session");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    await launch("/tmp/workspace", { panes: "4" });
+
+    // panes=4: leftColumnCount=2, rightColumnEditorCount=2, hasServer=true → totalRight=3
+    // right col loop: i=1 isServer=false (editor pane), i=2 isServer=true (server pane)
+    const tmuxCalls = mockExecSync.mock.calls
+      .map((c) => c[0] as string)
+      .filter((c) => c.startsWith("tmux "));
+    const splits = tmuxCalls.filter((c) => c.includes("split-window"));
+    // sidebar(1) + right-col-first(1) + left-col-loop(1) + right-col-loop(2) = 5
+    expect(splits.length).toBe(5);
+  });
+
+  it("uses plain shell pane in right-col loop when editor is empty and isServer is false", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        throw new Error("no session");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    await launch("/tmp/workspace", { editor: "", panes: "4" });
+
+    // editor="" + panes=4: rightColumnEditorCount=2, hasServer=true, secondaryEditor=null
+    // right-col loop i=1: isServer=false → null ?? ("" || undefined) → undefined (right side of ||)
+    const tmuxCalls = mockExecSync.mock.calls
+      .map((c) => c[0] as string)
+      .filter((c) => c.startsWith("tmux "));
+    const splits = tmuxCalls.filter((c) => c.includes("split-window"));
+    expect(splits.length).toBe(5);
+    expect(tmuxCalls.some((c) => c.includes("respawn-pane"))).toBe(false);
+  });
 });
 
 describe("server pane toggle", () => {
@@ -171,6 +274,28 @@ describe("server pane toggle", () => {
     // Count split-window calls — should be exactly 1 (sidebar only)
     const splits = tmuxCalls.filter((c) => c.includes("split-window"));
     expect(splits.length).toBe(1);
+  });
+
+  it("creates server-only right pane when panes=1 and server has no explicit command", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        throw new Error("no session");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    await launch("/tmp/workspace", { panes: "1" });
+
+    // panes=1, server="true" → rightColumnEditorCount=0, serverCommand=null
+    // line 224: serverCommand ?? undefined → null ?? undefined → undefined (right side of ??)
+    const tmuxCalls = mockExecSync.mock.calls
+      .map((c) => c[0] as string)
+      .filter((c) => c.startsWith("tmux "));
+    const splits = tmuxCalls.filter((c) => c.includes("split-window"));
+    // sidebar(1) + right-col-first(1, plain shell) = 2 splits; no loop iterations
+    expect(splits.length).toBe(2);
   });
 
   it("creates server-only right column when no right-col editors", async () => {
@@ -524,6 +649,32 @@ describe("KNOWN_INSTALL_COMMANDS — install hint generation", () => {
       await expect(launch("/tmp/workspace")).rejects.toThrow("process.exit");
       expect(mockExit).toHaveBeenCalledWith(1);
       expect(mockQuestion.mock.calls[0]?.[0]).toContain("apt-get");
+    } finally {
+      mockExit.mockRestore();
+      setPlatform(origPlatform);
+    }
+  });
+
+  it("tmux: returns null and exits on non-darwin non-linux platform", async () => {
+    const origPlatform = process.platform;
+    setPlatform("win32");
+
+    mockExecSync.mockImplementation((cmd: string) => {
+      if (cmd === "command -v tmux") throw new Error("not found");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      return Buffer.from("");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("process.exit");
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await expect(launch("/tmp/workspace")).rejects.toThrow("process.exit");
+      expect(mockExit).toHaveBeenCalledWith(1);
     } finally {
       mockExit.mockRestore();
       setPlatform(origPlatform);

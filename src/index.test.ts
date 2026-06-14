@@ -84,6 +84,20 @@ describe("safeParse — error handling", () => {
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining("Error:"));
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining("--help"));
   });
+
+  it("uses String(err) when parseArgs throws a non-Error value", async () => {
+    vi.doMock("node:util", async () => {
+      const actual = await vi.importActual("node:util") as typeof import("node:util");
+      return { ...actual, parseArgs: () => { throw "raw string error"; } };
+    });
+
+    process.argv = ["node", "index.js"];
+    await expect(import("./index.js")).rejects.toThrow("process.exit");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(console.error).toHaveBeenCalledWith("Error: raw string error");
+
+    vi.doUnmock("node:util");
+  });
 });
 
 describe("--version flag", () => {
