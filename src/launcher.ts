@@ -20,10 +20,24 @@ export interface CLIOverrides {
 function configureTmuxTitle(): void {
   try {
     tmux(`set-option -g set-titles on`);
-    tmux(`set-option -g set-titles-string '#{s/^tp-//:session_name}'`);
+    tmux(`set-option -g set-titles-string ${shellWord("#{s/^tp-//:session_name}")}`);
   } catch {
     // Non-critical — continue if title config fails
   }
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+function shellWord(value: string): string {
+  return /^[A-Za-z0-9_./:-]+$/.test(value) ? value : shellQuote(value);
+}
+
+function commandName(command: string): string {
+  const trimmed = command.trim();
+  const match = /^(?:"([^"]+)"|'([^']+)'|(\S+))/.exec(trimmed);
+  return match?.[1] ?? match?.[2] ?? match?.[3] ?? "";
 }
 
 function tmux(cmd: string): string {
@@ -37,15 +51,17 @@ function splitPane(
   cwd: string,
   command?: string,
 ): string {
-  const cmdPart = command ? ` "${command}; exec $SHELL"` : "";
+  const cmdPart = command ? ` ${shellWord(`${command}; exec $SHELL`)}` : "";
   return tmux(
-    `split-window -${dir} -t "${targetId}" -l ${size}% -c "${cwd}" -P -F "#{pane_id}"${cmdPart}`,
+    `split-window -${dir} -t ${shellWord(targetId)} -l ${size}% -c ${shellWord(cwd)} -P -F ${shellWord("#{pane_id}")}${cmdPart}`,
   );
 }
 
 function isCommandInstalled(cmd: string): boolean {
+  const binary = commandName(cmd);
+  if (!binary) return true;
   try {
-    execSync(`command -v ${cmd}`, { stdio: "ignore" });
+    execSync(`command -v ${shellWord(binary)}`, { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -197,7 +213,7 @@ export function resolveConfig(targetDir: string, cliOverrides: CLIOverrides): Re
 
 function configureMouseMode(sessionName: string, mouse: boolean): void {
   try {
-    tmux(`set-option -t "${sessionName}" mouse ${mouse ? "on" : "off"}`);
+    tmux(`set-option -t ${shellWord(sessionName)} mouse ${mouse ? "on" : "off"}`);
   } catch {
     // Non-critical — continue if mouse config fails
   }
@@ -205,8 +221,8 @@ function configureMouseMode(sessionName: string, mouse: boolean): void {
 
 function buildSession(sessionName: string, targetDir: string, plan: LayoutPlan, mouse: boolean): void {
   // Create detached session and capture the root pane ID
-  tmux(`new-session -d -s "${sessionName}" -c "${targetDir}"`);
-  const rootId = tmux(`display -t "${sessionName}:0" -p "#{pane_id}"`);
+  tmux(`new-session -d -s ${shellWord(sessionName)} -c ${shellWord(targetDir)}`);
+  const rootId = tmux(`display -t ${shellWord(`${sessionName}:0`)} -p ${shellWord("#{pane_id}")}`);
 
   // Enable/disable mouse mode for this session
   configureMouseMode(sessionName, mouse);
@@ -251,11 +267,11 @@ function buildSession(sessionName: string, targetDir: string, plan: LayoutPlan, 
 
   // Root pane was created with a plain shell — replace it with the editor
   if (plan.editor) {
-    tmux(`respawn-pane -k -t "${rootId}" -c "${targetDir}" "${plan.editor}; exec $SHELL"`);
+    tmux(`respawn-pane -k -t ${shellWord(rootId)} -c ${shellWord(targetDir)} ${shellWord(`${plan.editor}; exec $SHELL`)}`);
   }
 
   // Focus the first editor pane
-  tmux(`select-pane -t "${rootId}"`);
+  tmux(`select-pane -t ${shellWord(rootId)}`);
 }
 
 export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Promise<void> {
@@ -272,12 +288,10 @@ export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Pr
   if (plan.editor) await ensureCommand(plan.editor);
   if (plan.sidebarCommand) await ensureCommand(plan.sidebarCommand);
   if (plan.secondaryEditor) {
-    const secondaryBin = plan.secondaryEditor.split(" ")[0]!;
-    await ensureCommand(secondaryBin);
+    await ensureCommand(plan.secondaryEditor);
   }
   if (plan.serverCommand) {
-    const serverBin = plan.serverCommand.split(" ")[0]!;
-    await ensureCommand(serverBin);
+    await ensureCommand(plan.serverCommand);
   }
 
   const dirName = basename(targetDir).replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -285,14 +299,14 @@ export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Pr
 
   // If session already exists, kill it with --force or re-attach
   try {
-    execSync(`tmux has-session -t "${sessionName}"`, { stdio: "ignore" });
+    execSync(`tmux has-session -t ${shellWord(sessionName)}`, { stdio: "ignore" });
     if (cliOverrides?.force) {
-      execSync(`tmux kill-session -t "${sessionName}"`, { stdio: "ignore" });
+      execSync(`tmux kill-session -t ${shellWord(sessionName)}`, { stdio: "ignore" });
     } else {
       console.log(`Attaching to existing session: ${sessionName}`);
       configureMouseMode(sessionName, mouse);
       configureTmuxTitle();
-      execSync(`tmux attach-session -t "${sessionName}"`, { stdio: "inherit" });
+      execSync(`tmux attach-session -t ${shellWord(sessionName)}`, { stdio: "inherit" });
       return;
     }
   } catch {
@@ -303,7 +317,7 @@ export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Pr
 
   try {
     configureTmuxTitle();
-    execSync(`tmux attach-session -t "${sessionName}"`, { stdio: "inherit" });
+    execSync(`tmux attach-session -t ${shellWord(sessionName)}`, { stdio: "inherit" });
   } catch {
     // tmux exited (user detached / closed) — that's fine
   }

@@ -354,6 +354,36 @@ describe("server pane toggle", () => {
     );
     expect(serverSplit).toBeDefined();
   });
+
+  it("quotes project config values before passing them through the outer shell", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        throw new Error("no session");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    mockReadKVFile.mockReturnValue(new Map([
+      ["editor", "vim"],
+      ["panes", "1"],
+      ["sidebar", "lazygit"],
+      ["server", "npm run dev; touch /tmp/termplex-pwned"],
+    ]));
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    await launch("/tmp/work space; touch /tmp/termplex-dir");
+
+    const tmuxCalls = mockExecSync.mock.calls
+      .map((c) => c[0] as string)
+      .filter((c) => c.startsWith("tmux "));
+    const newSession = tmuxCalls.find((c) => c.includes("new-session"));
+    const serverSplit = tmuxCalls.find(
+      (c) => c.includes("split-window") && c.includes("npm run dev"),
+    );
+
+    expect(newSession).toContain("-c '/tmp/work space; touch /tmp/termplex-dir'");
+    expect(serverSplit).toContain("'npm run dev; touch /tmp/termplex-pwned; exec $SHELL'");
+  });
 });
 
 describe("command dependency checks", () => {
