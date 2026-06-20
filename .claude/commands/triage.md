@@ -2,15 +2,15 @@
 
 Model tier: **sonnet** — Sonnet 4.6 (1M context) session.
 
-Process all overnight agent reports. Discovers every report using timestamp-based discovery, checks for agent failures, synthesizes findings, proposes an action plan, and implements all fixes. Reports are never committed -- they stay on disk as local operational history (Rule #70).
+Process all overnight agent reports, all open GitHub PRs, and the Dependabot PR queue. Discovers every report using timestamp-based discovery, checks for agent failures, inventories every open PR, scans open Dependabot PRs for special handling (Rule #72), synthesizes findings, proposes an action plan, implements all fixes, and merges the Dependabot PRs that are safe to auto-merge. Report commit policy depends on repo visibility: public repos keep reports local, private repos commit them as historical artifacts (Rule #70).
 
 ## Input
 
-If `$ARGUMENTS` is provided, process only the specified report path(s). Otherwise, auto-discover all new/modified reports in `docs/agents/`. If no reports found and no agent failures detected, report "all clear" and **STOP.**
+If `$ARGUMENTS` is provided, process only the specified report path(s). Always include all open GitHub PRs. Otherwise, auto-discover all new/modified reports in `docs/agents/`. If no reports found, no agent failures detected, and no open PRs exist, report "all clear" and **STOP.**
 
 ## Step 1: Discovery
 
-Find EVERY report and agent failure. No assumptions about which agents ran or how many reports exist. Discovery uses file timestamps, not git status (Rule #71).
+Find EVERY report, agent failure, and open GitHub PR. No assumptions about which agents ran, how many reports exist, or how many PRs are open. Report discovery uses file timestamps, not git status (Rule #71).
 
 1. **Timestamp-based scan:**
 
@@ -52,12 +52,48 @@ Find EVERY report and agent failure. No assumptions about which agents ran or ho
    - If an agent failed but has no corresponding report in `docs/agents/`,
      flag it: "agent-name FAILED to produce a report -- check `logs/agent-name.error.log`"
 
-3. **Classify files:**
+3. **Check for all open GitHub PRs:**
+
+   ```bash
+   gh pr list --state open \
+     --json number,title,author,headRefName,baseRefName,isDraft,reviewDecision,mergeStateStatus,statusCheckRollup,updatedAt,url
+   ```
+
+   For each open PR, capture:
+   - Number, title, author, URL.
+   - Head branch and base branch.
+   - Draft status.
+   - Review decision.
+   - Merge state.
+   - CI/check status summary.
+   - Last updated timestamp.
+
+   If `gh pr list` fails, include a GitHub PR discovery failure in the briefing and action plan instead of silently omitting PRs.
+
+4. **Check for open Dependabot PRs (Rule #72):**
+
+   ```bash
+   gh pr list --author "app/dependabot" \
+     --json number,title,headRefName,mergeable,mergeStateStatus,statusCheckRollup,labels
+   ```
+
+   For each PR, classify the update type from the title (e.g., `Bump foo from 1.2.3 to 1.2.4` -> patch; `1.2.x -> 1.3.0` -> minor; `1.x -> 2.0.0` -> major) and the CI status:
+
+   - **patch + CI green** -> ready-to-merge (auto)
+   - **minor + CI green** -> ready-to-merge (auto)
+   - **major** -> defer, human review required (regardless of CI)
+   - **CI red, fix looks obvious** (e.g., snapshot/lockfile drift) -> attempt-fix
+   - **CI red, not obvious** -> defer, note in report
+   - **Mergeable conflict** -> attempt rebase via `gh pr update-branch`; if still conflicting, defer
+
+5. **Classify files and PRs:**
    - New/modified reports (newer than `.last-triage`): primary triage targets.
    - `shared-context.md`: read for cross-agent intelligence, not a report itself.
    - Unchanged reports (older than `.last-triage`): skip -- already processed.
+   - Open PRs: primary triage targets every run, regardless of `.last-triage`.
+   - Dependabot PRs: subset of open PRs with special handling in Step 5.
 
-4. **Present discovery results:**
+6. **Present discovery results:**
 
    Agent Failures (if any):
 
@@ -69,9 +105,19 @@ Find EVERY report and agent failure. No assumptions about which agents ran or ho
    | # | Report File | Modified | Size |
    |---|-------------|----------|------|
 
-   Total: N reports to process, M agent failures detected.
+   Open Pull Requests:
 
-   Do NOT stop here -- proceed directly to analysis unless there are ZERO reports and ZERO failures (in which case report "all clear" and **STOP**).
+   | # | PR | Title | Branch | Base | Draft | Review | Merge State | Checks | Updated |
+   |---|----|-------|--------|------|-------|--------|-------------|--------|---------|
+
+   Dependabot PRs (if any):
+
+   | # | PR | Update Type | CI | Disposition |
+   |---|----|----|----|----|
+
+   Total: N reports to process, M agent failures detected, P open PRs found, K Dependabot PRs (auto-merge: A, attempt-fix: F, defer: D).
+
+   Do NOT stop here -- proceed directly to analysis unless there are ZERO reports, ZERO failures, AND ZERO open PRs (in which case report "all clear" and **STOP**).
 
 ## Step 2: Analyze
 
@@ -88,14 +134,24 @@ Read-only. Do not modify any files.
    - Action items (what needs fixing)
    - Carried items (persistent across multiple cycles)
 
-4. **Synthesize across all reports:**
+4. **Analyze EVERY open PR** from discovery:
+   - Determine status: GREEN / YELLOW / RED.
+   - RED: failing required checks, merge conflicts, blocked review state, or clear release blocker.
+   - YELLOW: draft, pending checks, changes requested, stale/needs owner attention, or unclear readiness.
+   - GREEN: ready or no action needed.
+   - Extract action items: fix failing CI, resolve conflicts, request/perform review, update stale branch, close superseded PR, or document that no action is needed.
+   - Dependabot PRs also receive the Rule #72 disposition for Step 5.
+   - Do not modify another PR branch during Step 2; only describe the action needed.
+
+5. **Synthesize across all reports and PRs:**
    - Cross-reference findings (e.g., coverage report flags X needs tests, code quality report flags X has lint issues -- group them).
+   - Cross-reference PR findings with agent reports when a report appears to describe the same branch, issue, or failure.
    - Identify patterns (multiple agents flagging the same area).
    - Check shared-context.md recommendations against report findings.
 
-5. **Draft the action plan:**
+6. **Draft the action plan:**
 
-   Group action items by report. Include ALL items -- fix everything (Rule #58). For each item: what to do, which files, expected outcome.
+   Group action items by report and PR. Include ALL items -- fix everything that is in the current working branch and explicitly identify PR-owned work that requires checking out the PR branch or human ownership (Rule #58). For each item: what to do, which files or PR branch, expected outcome.
 
    ```markdown
    ## Action Plan
@@ -107,16 +163,24 @@ Read-only. Do not modify any files.
    ### From [report-name] (STATUS)
    3. [Action item...]
 
-   Total: N action items across M reports. All will be implemented.
+   ### From PR #[number] (STATUS)
+   4. [Action item with PR branch, checks/review state, and expected outcome]
+
+   ### Dependabot PRs (Step 5)
+   - Auto-merge: PR #X (patch), PR #Y (minor)
+   - Attempt-fix: PR #Z (snapshot drift)
+   - Defer: PR #W (major bump)
+
+   Total: N action items across M reports and P open PRs. K Dependabot PRs to process. All in-scope items will be implemented after approval; PR branch actions require explicit approval when they affect a branch other than the current branch.
    ```
 
-6. **Present the briefing and action plan to the user.**
+7. **Present the briefing and action plan to the user.**
 
 **STOP.** Wait for the user to review and approve the action plan.
 
 ## Step 3: Execute
 
-After user approval, implement all action items.
+After user approval, implement all in-scope action items.
 
 1. **Implement fixes** following TDD where applicable:
    - Test coverage gaps: write the tests.
@@ -125,6 +189,8 @@ After user approval, implement all action items.
    - Dependency updates: update and verify.
    - Documentation gaps: update the docs.
    - Configuration issues: fix the config.
+   - PR findings on the current branch: fix the code, docs, checks, or metadata directly.
+   - PR findings on other branches: check out the PR branch only with explicit approval, then fix and verify there.
 
 2. **Run verification sequentially:**
 
@@ -138,7 +204,14 @@ After user approval, implement all action items.
 
 ## Step 4: Commit & Push
 
-Reports are NEVER committed (Rule #70). Only code fixes enter version control.
+Commit policy depends on repo visibility (Rule #70). Determine visibility before staging:
+
+```bash
+gh repo view --json visibility --jq '.visibility' 2>/dev/null
+# PUBLIC -> commit code fixes only (reports gitignored)
+# PRIVATE / INTERNAL -> commit code fixes AND reports
+# (no remote / gh unavailable) -> treat as PUBLIC (fail-safe)
+```
 
 1. **Append triage entry to shared-context.md:**
 
@@ -146,6 +219,7 @@ Reports are NEVER committed (Rule #70). Only code fixes enter version control.
    <!-- ENTRY:START agent=triage timestamp=ISO -->
    ## Triage -- YYYY-MM-DD
    - **Reports processed**: N
+   - **Open PRs reviewed**: P
    - **Action items resolved**: M
    - **Summary**: [1-line summary of what was fixed]
    **Cross-agent recommendations:**
@@ -153,14 +227,23 @@ Reports are NEVER committed (Rule #70). Only code fixes enter version control.
    <!-- ENTRY:END -->
    ```
 
-2. **Commit code fixes only** (if any fixes were made):
+2. **Commit changes:**
+
+   On a **public repo** (or no remote), commit code fixes only:
 
    ```bash
    git add <changed-files>
    git commit -m "fix: resolve agent report findings [triage]"
    ```
 
-   Do NOT `git add` anything in `docs/agents/` or `logs/`. These directories are gitignored.
+   `docs/agents/`, `logs/`, and `scripts/agents/` are gitignored — do NOT `git add` anything in them.
+
+   On a **private repo**, commit code fixes and reports together:
+
+   ```bash
+   git add <changed-files> docs/agents/ logs/ scripts/agents/
+   git commit -m "fix: resolve agent report findings [triage]"
+   ```
 
 3. **Push to remote. Monitor CI:**
 
@@ -178,13 +261,51 @@ Reports are NEVER committed (Rule #70). Only code fixes enter version control.
    touch docs/agents/.last-triage
    ```
 
-## Step 5: Report
+## Step 5: Process Dependabot PRs
+
+After the triage commit is pushed and green, process the Dependabot PRs identified in Step 1.4 (Rule #72). These are independent commits from the triage code fixes -- handle them last so a flaky dependency PR doesn't block triage.
+
+For each PR by disposition:
+
+1. **auto-merge (patch + CI green, minor + CI green):**
+
+   ```bash
+   gh pr merge <num> --squash --auto --delete-branch
+   ```
+
+   `--auto` waits for required checks; `--delete-branch` keeps the remote tidy.
+
+2. **attempt-fix (CI red, fix obvious — e.g., snapshot/lockfile drift, generated file out of date):**
+
+   - Check out the PR locally: `gh pr checkout <num>`
+   - Regenerate the affected file (run the project's update script, regenerate snapshots, etc.)
+   - Push the fix to the PR branch
+   - If CI goes green, queue the auto-merge as in step 1
+   - One attempt only -- if it doesn't go green, defer
+
+3. **defer (major, non-obvious CI failures, conflicts after rebase):**
+
+   - Add a comment summarizing why it's deferred (e.g., "Major version bump -- requires human review of breaking changes")
+   - Leave the PR open
+   - Note in the triage report's deferred-PRs section
+
+4. **Mergeable conflicts (before classifying as defer):**
+
+   ```bash
+   gh pr update-branch <num>
+   ```
+
+   If the rebase resolves the conflict and CI is green, proceed with auto-merge. Otherwise, defer.
+
+Switch back to the triage branch (`main` or wherever the session started) before continuing to the report step.
+
+## Step 6: Report
 
 Generate a triage report at `docs/agents/triage-report.md`:
 
 ```markdown
 # Triage Report
-> Generated on [date] | [N] reports processed | [M] action items
+> Generated on [date] | [N] reports processed | [M] action items | [P] open PRs | [K] Dependabot PRs
 
 ## Agent Failures
 | Agent | Error | Log File |
@@ -195,11 +316,20 @@ Generate a triage report at `docs/agents/triage-report.md`:
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
 
+## Pull Requests Reviewed
+| # | PR | Branch | Base | Draft | Review | Merge State | Checks | Status | Action Items |
+|---|----|--------|------|-------|--------|-------------|--------|--------|--------------|
+
 ## Overall Status: GREEN / YELLOW / RED
 
 ## Action Items Completed
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
+
+## Dependabot PRs
+| # | PR | Update Type | Disposition | Notes |
+|---|----|----|----|----|
+(or "None -- no open Dependabot PRs")
 
 ## Verification
 - [ ] All tests passing
@@ -215,8 +345,9 @@ Present the report summary to the user.
 
 ## Rules
 
-- **Exhaustive discovery.** Use timestamp-based scan (Rule #71). Never assume how many reports exist. Present the full count before processing.
-- **Never commit reports (Rule #70).** Reports stay on disk as local operational history. Only code fixes are committed. `docs/agents/`, `logs/`, and `scripts/agents/` are gitignored.
+- **Exhaustive discovery.** Use timestamp-based scan for reports (Rule #71) and always query all open GitHub PRs. Never assume how many reports or PRs exist. Present the full count before processing.
+- **Report commit policy is visibility-conditional (Rule #70).** Public repos: reports stay local, only code fixes are committed (`docs/agents/`, `logs/`, `scripts/agents/` gitignored). Private repos: reports are committed alongside code fixes as historical artifacts.
+- **Process Dependabot PRs (Rule #72).** Triage scans for open Dependabot PRs and merges what it can: patch + minor with green CI auto-merge, majors defer for human review, obvious CI failures get one fix attempt. Dependabot processing happens last so it can't block triage code fixes.
 - **Touch `.last-triage` after completion.** This marks all current reports as processed for the next triage run.
 - **Check for agent failures.** Scan `logs/` BEFORE analyzing reports. A missing report might mean a failed agent, not "nothing to report."
 - **Fix everything (Rule #58).** Categorize findings by severity, but implement 100% of action items. No deferring. No "nothing urgent."

@@ -110,5 +110,7 @@ Go directly to these paths -- never search for them.
 |-------|------|-------|
 | Source | `src/` | Co-located tests (`*.test.ts`) |
 | Config | `~/.config/termplex/` | Runtime config dir |
+| Agent reports | `docs/agents/*-report.md` | Gitignored on public repos; tracked on private (Rule #70) |
 | Research | `docs/research/YYYY-MM-DD-*.md` | |
 | Plans | `docs/plans/YYYY-MM-DD-*.md` | `-phases/` |
+| ADRs | `docs/decisions/` | |

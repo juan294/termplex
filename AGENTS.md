@@ -36,8 +36,9 @@ document fully before doing anything else.
 The command files are written for Claude Code. In Codex, translate the
 Claude-native parts to the closest equivalent behavior:
 
-- `/simplify` -- run a dedicated post-implementation review for reuse,
-  quality, and efficiency; use parallel agents when helpful
+- `/simplify` -- if `codex-simplify` is installed, use it; otherwise run
+  a dedicated post-implementation review for reuse, quality, and
+  efficiency; use parallel agents when helpful
 - `/batch` -- parallelize independent work with separate worktrees or
   isolated agents when the plan marks phases as `[batch-eligible]`
 - `/worktree` or `EnterWorktree` -- perform implementation in an isolated
@@ -50,6 +51,15 @@ Claude-native parts to the closest equivalent behavior:
   literal required commands
 
 Preserve the methodology even when the harness differs.
+
+## Codex-Only Skills
+
+- Do not define a project skill literally named `simplify` in a
+  Claude-compatible repo.
+- If Codex needs a local equivalent of a Claude-native command, use a
+  non-conflicting name such as `codex-simplify`.
+- Keep the canonical copy outside `.claude/skills/` and sync it into
+  `~/.codex/skills/` for local Codex discovery.
 
 ## Rules Loading
 
@@ -70,6 +80,9 @@ Treat `.claude/skills/*/SKILL.md` as on-demand skills:
 - Use the skill as supplemental instructions, not as a replacement for
   the command workflow
 
+Personal Codex-only skills may also exist in `~/.codex/skills/`.
+Use them only when they do not shadow Claude-native command names.
+
 ## Outputs and Gates
 
 Preserve the standard cc-rpi artifact locations:
@@ -77,7 +90,8 @@ Preserve the standard cc-rpi artifact locations:
 - `docs/research/` -- research documents
 - `docs/plans/` -- implementation plans and phase files
 - `docs/decisions/` -- ADRs and decision records
-- `docs/agents/` -- local operational reports
+- `docs/agents/` -- operational reports (commit policy follows repo
+  visibility per Rule #70: gitignored on public repos, tracked on private)
 
 Respect the phase gates:
 
@@ -97,3 +111,6 @@ describe what exists; do not suggest improvements unless asked.
   can be parallelized
 - Preserve the project's git workflow exactly as described in
   `CLAUDE.md`
+- Preserve the project's branch topology exactly as documented in
+  `CLAUDE.md`, and keep implementation work in isolated worktrees or
+  temporary branches
