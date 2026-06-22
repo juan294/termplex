@@ -2,7 +2,7 @@
 
 Model tier: **sonnet** — Sonnet 4.6 (1M context) session.
 
-Process all overnight agent reports, all open GitHub PRs, and the Dependabot PR queue. Discovers every report using timestamp-based discovery, checks for agent failures, inventories every open PR, scans open Dependabot PRs for special handling (Rule #72), synthesizes findings, proposes an action plan, implements all fixes, and merges the Dependabot PRs that are safe to auto-merge. Report commit policy depends on repo visibility: public repos keep reports local, private repos commit them as historical artifacts (Rule #70).
+Process all overnight agent reports, all open GitHub PRs, GitHub Security & Quality Alerts, and the Dependabot PR queue. Discovers every report using timestamp-based discovery, checks for agent failures, inventories every open PR, scans open Dependabot PRs for special handling (Rule #72), synthesizes findings, proposes an action plan, implements all fixes, and merges the Dependabot PRs that are safe to auto-merge. Report commit policy depends on repo visibility: public repos keep reports local, private repos commit them as historical artifacts (Rule #70).
 
 ## Input
 
@@ -10,7 +10,7 @@ If `$ARGUMENTS` is provided, process only the specified report path(s). Always i
 
 ## Step 1: Discovery
 
-Find EVERY report, agent failure, and open GitHub PR. No assumptions about which agents ran, how many reports exist, or how many PRs are open. Report discovery uses file timestamps, not git status (Rule #71).
+Find EVERY report, agent failure, open GitHub PR, and GitHub security/quality alert. No assumptions about which agents ran, how many reports exist, how many PRs are open, or whether GitHub has alerts. Report discovery uses file timestamps, not git status (Rule #71).
 
 1. **Timestamp-based scan:**
 
@@ -86,14 +86,43 @@ Find EVERY report, agent failure, and open GitHub PR. No assumptions about which
    - **CI red, not obvious** -> defer, note in report
    - **Mergeable conflict** -> attempt rebase via `gh pr update-branch`; if still conflicting, defer
 
-5. **Classify files and PRs:**
+5. **Check GitHub Security & Quality Alerts (critical):**
+
+   Determine the repository identifier first:
+
+   ```bash
+   REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+   ```
+
+   Query GitHub alert surfaces every triage run. These checks are mandatory
+   and independent from local agent reports:
+
+   ```bash
+   gh api --paginate "repos/$REPO/code-scanning/alerts?state=open"      --jq ".[] | {number, state, tool: .tool.name, rule: .rule.id, severity: (.rule.security_severity_level // .rule.severity), description: .rule.description, html_url, path: .most_recent_instance.location.path, line: .most_recent_instance.location.start_line}"
+
+   gh api --paginate "repos/$REPO/dependabot/alerts?state=open"      --jq ".[] | {number, state, severity: .security_advisory.severity, package: .dependency.package.name, ecosystem: .dependency.package.ecosystem, manifest: .dependency.manifest_path, advisory: .security_advisory.ghsa_id, summary: .security_advisory.summary, html_url}"
+
+   gh api --paginate "repos/$REPO/secret-scanning/alerts?state=open"      --jq ".[] | {number, state, secret_type, secret_type_display_name, resolution, html_url, created_at}"
+   ```
+
+   Treat all open alerts as triage findings:
+   - **Code scanning / CodeQL alerts:** include every open alert, security or
+     quality, from every tool. Do not filter out low/medium quality warnings.
+   - **Dependabot security alerts:** include every open dependency alert,
+     whether or not a Dependabot PR already exists.
+   - **Secret scanning alerts:** include every open alert; redact secret values.
+   - **API/query failure:** if any GitHub alert query fails, returns 403/404,
+     or appears disabled despite the repo being expected to have alerts
+     enabled, include a discovery failure in the briefing and action plan.
+
+6. **Classify files and PRs:**
    - New/modified reports (newer than `.last-triage`): primary triage targets.
    - `shared-context.md`: read for cross-agent intelligence, not a report itself.
    - Unchanged reports (older than `.last-triage`): skip -- already processed.
    - Open PRs: primary triage targets every run, regardless of `.last-triage`.
    - Dependabot PRs: subset of open PRs with special handling in Step 5.
 
-6. **Present discovery results:**
+7. **Present discovery results:**
 
    Agent Failures (if any):
 
@@ -110,14 +139,19 @@ Find EVERY report, agent failure, and open GitHub PR. No assumptions about which
    | # | PR | Title | Branch | Base | Draft | Review | Merge State | Checks | Updated |
    |---|----|-------|--------|------|-------|--------|-------------|--------|---------|
 
+   GitHub Security & Quality Alerts (if any):
+
+   | # | Type | Severity | Tool/Package | Rule/Advisory | Location | Status |
+   |---|------|----------|--------------|---------------|----------|--------|
+
    Dependabot PRs (if any):
 
    | # | PR | Update Type | CI | Disposition |
    |---|----|----|----|----|
 
-   Total: N reports to process, M agent failures detected, P open PRs found, K Dependabot PRs (auto-merge: A, attempt-fix: F, defer: D).
+   Total: N reports to process, M agent failures detected, P open PRs found, G GitHub security/quality alerts found, K Dependabot PRs (auto-merge: A, attempt-fix: F, defer: D).
 
-   Do NOT stop here -- proceed directly to analysis unless there are ZERO reports, ZERO failures, AND ZERO open PRs (in which case report "all clear" and **STOP**).
+   Do NOT stop here -- proceed directly to analysis unless there are ZERO reports, ZERO failures, ZERO open PRs, ZERO GitHub security/quality alerts, and ZERO GitHub alert query failures (in which case report "all clear" and **STOP**).
 
 ## Step 2: Analyze
 
@@ -159,13 +193,22 @@ Read-only. Do not modify any files.
    - Dependabot PRs also receive the Rule #72 disposition for Step 5.
    - Do not modify another PR branch during Step 2; only describe the action needed.
 
-6. **Synthesize across all reports and PRs:**
+6. **Analyze EVERY GitHub security and quality alert** from discovery:
+   - Determine status: GREEN / YELLOW / RED.
+   - RED: open critical/high security alert, active secret scanning alert, or any alert with known exploit/public exposure.
+   - YELLOW: open medium/low security alert, CodeQL/code-scanning quality alert, or query failure that prevents alert visibility.
+   - GREEN: no open alerts and all alert queries succeeded.
+   - Extract action items: fix vulnerable dependency, remediate CodeQL/code-scanning finding, rotate/revoke exposed secret, enable/fix GitHub alert scanning, or document that the alert is already resolved but awaiting GitHub rescan.
+   - Cross-reference Dependabot security alerts with Dependabot PRs, but do not treat a PR as sufficient unless it is merged or queued for merge with green checks.
+
+7. **Synthesize across all reports, PRs, and GitHub alerts:**
    - Cross-reference findings (e.g., coverage report flags X needs tests, code quality report flags X has lint issues -- group them).
    - Cross-reference PR findings with agent reports when a report appears to describe the same branch, issue, or failure.
    - Identify patterns (multiple agents flagging the same area).
    - Check shared-context.md recommendations against report findings.
+   - Cross-reference GitHub alerts with report findings, Dependabot PRs, and carried items so GitHub-native warnings cannot be hidden by GREEN local reports.
 
-7. **Draft the action plan:**
+8. **Draft the action plan:**
 
    Group action items by report and PR. Include ALL extracted items from every
    report -- fix everything that is in the current working branch and explicitly
@@ -191,15 +234,20 @@ Read-only. Do not modify any files.
    ### From PR #[number] (STATUS)
    4. [Action item with PR branch, checks/review state, and expected outcome]
 
+   ### GitHub Security & Quality Alerts
+   - Alert #X (code scanning / CodeQL): [rule, severity, file:line, action]
+   - Alert #Y (Dependabot security): [package, advisory, manifest, action]
+   - Alert #Z (secret scanning): [secret type, action without secret value]
+
    ### Dependabot PRs (Step 5)
    - Auto-merge: PR #X (patch), PR #Y (minor)
    - Attempt-fix: PR #Z (snapshot drift)
    - Defer: PR #W (major bump)
 
-   Total: N action items across M reports and P open PRs. K Dependabot PRs to process. All in-scope items will be implemented after approval; PR branch actions require explicit approval when they affect a branch other than the current branch.
+   Total: N action items across M reports, P open PRs, and G GitHub alerts. K Dependabot PRs to process. All in-scope items will be implemented after approval; PR branch actions require explicit approval when they affect a branch other than the current branch.
    ```
 
-8. **Present the briefing and action plan to the user.**
+9. **Present the briefing and action plan to the user.**
 
 **STOP.** Wait for the user to review and approve the action plan.
 
@@ -211,6 +259,7 @@ After user approval, implement all in-scope action items.
    - Test coverage gaps: write the tests.
    - Code quality issues: fix the code.
    - Security findings: apply the fix.
+   - GitHub security/quality alerts: fix the underlying dependency, code, configuration, or secret exposure; reference the GitHub alert number and verify the alert is closed or waiting for GitHub rescan.
    - Dependency updates: update and verify.
    - Documentation gaps: update the docs.
    - Configuration issues: fix the config.
@@ -355,6 +404,11 @@ Generate a triage report at `docs/agents/triage-report.md`:
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
 
+## GitHub Security & Quality Alerts
+| # | Type | Severity | Tool/Package | Rule/Advisory | Location | Status | Notes |
+|---|------|----------|--------------|---------------|----------|--------|-------|
+(or "None -- no open GitHub security or quality alerts")
+
 ## Dependabot PRs
 | # | PR | Update Type | Disposition | Notes |
 |---|----|----|----|----|
@@ -376,6 +430,7 @@ Present the report summary to the user.
 
 - **Exhaustive discovery.** Use timestamp-based scan for reports (Rule #71) and always query all open GitHub PRs. Never assume how many reports or PRs exist. Present the full count before processing.
 - **Report commit policy is visibility-conditional (Rule #70).** Public repos: reports stay local, only code fixes are committed (`docs/agents/`, `logs/`, `scripts/agents/` gitignored). Private repos: reports are committed alongside code fixes as historical artifacts.
+- **GitHub alert coverage is mandatory.** Every triage run must query and report GitHub code scanning alerts (including CodeQL and quality warnings), Dependabot security alerts, and secret scanning alerts. Do not rely only on local agent reports. If a query fails or alerts appear disabled unexpectedly, report that as a YELLOW/RED triage finding and action item.
 - **Process Dependabot PRs (Rule #72).** Triage scans for open Dependabot PRs and merges what it can: patch + minor with green CI auto-merge, majors defer for human review, obvious CI failures get one fix attempt. Dependabot processing happens last so it can't block triage code fixes.
 - **Touch `.last-triage` after completion.** This marks all current reports as processed for the next triage run.
 - **Check for agent failures.** Scan `logs/` BEFORE analyzing reports. A missing report might mean a failed agent, not "nothing to report."
