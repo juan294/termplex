@@ -127,14 +127,30 @@ Read-only. Do not modify any files.
 
 2. **Read EVERY report** from the discovery list. Completely. No skimming.
 
-3. **For each report, extract:**
+3. **Leanness report handling:** If a discovered report is
+   `leanness-report.md`, read it completely and treat its recommendations
+   as actionable triage items. Extract every concrete `shrink`, `delete`,
+   `yagni`, duplication, dead-code, or efficiency finding as an action item.
+   If the report says "review individually" or "do not bulk-apply", satisfy
+   that requirement by listing each leanness recommendation separately in the
+   action plan with its target files, expected line/complexity reduction, test
+   coverage expectation, and any breaking-change caution. Do not treat the
+   entire leanness report as one bulk refactor.
+
+   Leanness items still follow Rule #58 after user approval: fix all extracted
+   action items. During execution, preserve public APIs unless the action item
+   explicitly identifies a dead export or unused surface; for any possible
+   breaking change, verify importers first and document the compatibility
+   judgment in the report.
+
+4. **For each report, extract:**
    - Status: GREEN / YELLOW / RED
    - Key findings (bullet points)
    - Metrics (numbers, trends)
    - Action items (what needs fixing)
    - Carried items (persistent across multiple cycles)
 
-4. **Analyze EVERY open PR** from discovery:
+5. **Analyze EVERY open PR** from discovery:
    - Determine status: GREEN / YELLOW / RED.
    - RED: failing required checks, merge conflicts, blocked review state, or clear release blocker.
    - YELLOW: draft, pending checks, changes requested, stale/needs owner attention, or unclear readiness.
@@ -143,15 +159,24 @@ Read-only. Do not modify any files.
    - Dependabot PRs also receive the Rule #72 disposition for Step 5.
    - Do not modify another PR branch during Step 2; only describe the action needed.
 
-5. **Synthesize across all reports and PRs:**
+6. **Synthesize across all reports and PRs:**
    - Cross-reference findings (e.g., coverage report flags X needs tests, code quality report flags X has lint issues -- group them).
    - Cross-reference PR findings with agent reports when a report appears to describe the same branch, issue, or failure.
    - Identify patterns (multiple agents flagging the same area).
    - Check shared-context.md recommendations against report findings.
 
-6. **Draft the action plan:**
+7. **Draft the action plan:**
 
-   Group action items by report and PR. Include ALL items -- fix everything that is in the current working branch and explicitly identify PR-owned work that requires checking out the PR branch or human ownership (Rule #58). For each item: what to do, which files or PR branch, expected outcome.
+   Group action items by report and PR. Include ALL extracted items from every
+   report -- fix everything that is in the current working branch and explicitly
+   identify PR-owned work that requires checking out the PR branch or human
+   ownership (Rule #58). For each item: what to do, which files or PR branch,
+   expected outcome.
+
+   For `leanness-report.md`, include a dedicated "Leanness Recommendations"
+   section and list each recommendation as its own numbered item. Include:
+   target files, action type (`shrink`, `delete`, `yagni`, etc.), expected
+   reduction or simplification, test strategy, and compatibility risk.
 
    ```markdown
    ## Action Plan
@@ -174,7 +199,7 @@ Read-only. Do not modify any files.
    Total: N action items across M reports and P open PRs. K Dependabot PRs to process. All in-scope items will be implemented after approval; PR branch actions require explicit approval when they affect a branch other than the current branch.
    ```
 
-7. **Present the briefing and action plan to the user.**
+8. **Present the briefing and action plan to the user.**
 
 **STOP.** Wait for the user to review and approve the action plan.
 
@@ -189,6 +214,10 @@ After user approval, implement all in-scope action items.
    - Dependency updates: update and verify.
    - Documentation gaps: update the docs.
    - Configuration issues: fix the config.
+   - Leanness findings: make the smallest behavior-preserving refactor or
+     deletion that resolves the specific finding; use existing coverage for
+     pure refactors when sufficient, and add or update tests when behavior,
+     public API, or compatibility could change.
    - PR findings on the current branch: fix the code, docs, checks, or metadata directly.
    - PR findings on other branches: check out the PR branch only with explicit approval, then fix and verify there.
 
@@ -350,8 +379,9 @@ Present the report summary to the user.
 - **Process Dependabot PRs (Rule #72).** Triage scans for open Dependabot PRs and merges what it can: patch + minor with green CI auto-merge, majors defer for human review, obvious CI failures get one fix attempt. Dependabot processing happens last so it can't block triage code fixes.
 - **Touch `.last-triage` after completion.** This marks all current reports as processed for the next triage run.
 - **Check for agent failures.** Scan `logs/` BEFORE analyzing reports. A missing report might mean a failed agent, not "nothing to report."
-- **Fix everything (Rule #58).** Categorize findings by severity, but implement 100% of action items. No deferring. No "nothing urgent."
-- **Read every report completely.** No skimming, no summaries-of-summaries. Extract ALL action items from every report.
+- **Fix everything (Rule #58).** Categorize findings by severity, but implement 100% of action items. No deferring. No "nothing urgent." `leanness-report.md` is actionable: extract and implement every concrete recommendation after the user approves the action plan.
+- **Leanness safety.** Leanness recommendations are not bulk-applied as an undifferentiated cleanup. Review each item individually, keep edits scoped to the files named by the report, preserve behavior, verify importer/public API impact before deleting exports, and rely on or add tests according to the risk.
+- **Read every report completely.** No skimming, no summaries-of-summaries. Extract ALL action items from every report, including `leanness-report.md`.
 - **shared-context.md integration.** Read before analysis, append triage entry after completion.
 - **CI accountability.** Push is not done until CI is green. Max 3 fix iterations.
 - **Branch verification before every commit.** Run `git branch --show-current` first (Error #33).
