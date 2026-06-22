@@ -2,8 +2,22 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock child_process before importing launcher
 const mockExecSync = vi.fn();
+
+function shellQuoteForTest(value: string): string {
+  return /^[A-Za-z0-9_./:-]+$/.test(value)
+    ? value
+    : `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+function commandForExecFile(file: string, args: readonly string[] = []): string {
+  if (file === "which") return `command -v ${shellQuoteForTest(args[0] ?? "")}`;
+  return [file, ...args.map(shellQuoteForTest)].join(" ");
+}
+
 vi.mock("node:child_process", () => ({
   execSync: (...args: unknown[]) => mockExecSync(...args),
+  execFileSync: (file: string, args?: readonly string[], options?: unknown) =>
+    mockExecSync(commandForExecFile(file, args), options),
 }));
 
 // Mock config
@@ -540,6 +554,89 @@ describe("command dependency checks", () => {
       .map((c) => c[0] as string)
       .filter((c) => c.startsWith("command -v "));
     // Only tmux should be checked
+    expect(commandChecks).toEqual(["command -v tmux"]);
+  });
+
+  it("checks a double-quoted command name without its arguments", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (cmd === "command -v quoted-tool") throw new Error("not found");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockImplementation((key: string) => {
+      if (key === "editor") return "\"quoted-tool\" --flag";
+      if (key === "sidebar") return "";
+      return undefined;
+    });
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("process.exit");
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await expect(launch("/tmp/workspace")).rejects.toThrow("process.exit");
+
+      expect(mockExecSync).toHaveBeenCalledWith("command -v quoted-tool", {
+        stdio: "ignore",
+      });
+    } finally {
+      mockExit.mockRestore();
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("checks a single-quoted command name without its arguments", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (cmd === "command -v single-tool") throw new Error("not found");
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      return opts?.encoding ? "" : Buffer.from("");
+    });
+    vi.mocked(getConfig).mockImplementation((key: string) => {
+      if (key === "editor") return "'single-tool' --flag";
+      if (key === "sidebar") return "";
+      return undefined;
+    });
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("process.exit");
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await expect(launch("/tmp/workspace")).rejects.toThrow("process.exit");
+
+      expect(mockExecSync).toHaveBeenCalledWith("command -v single-tool", {
+        stdio: "ignore",
+      });
+    } finally {
+      mockExit.mockRestore();
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("treats a whitespace-only command as no dependency to check", async () => {
+    mockExecSync.mockImplementation((cmd: string, opts?: { encoding?: string }) => {
+      if (typeof cmd === "string" && cmd.startsWith("command -v "))
+        return Buffer.from("/usr/bin/stub");
+      if (typeof cmd === "string" && cmd.includes("has-session"))
+        throw new Error("no session");
+      return opts?.encoding ? "%0" : Buffer.from("%0");
+    });
+    vi.mocked(getConfig).mockReturnValue(undefined);
+
+    await launch("/tmp/workspace", {
+      editor: "",
+      sidebar: "",
+      server: "   ",
+      panes: "1",
+    });
+
+    const commandChecks = mockExecSync.mock.calls
+      .map((c) => c[0] as string)
+      .filter((c) => c.startsWith("command -v "));
     expect(commandChecks).toEqual(["command -v tmux"]);
   });
 

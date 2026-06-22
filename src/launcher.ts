@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
 import { createInterface } from "node:readline";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { planLayout, isPresetName, getPreset } from "./layout.js";
 import type { LayoutOptions, LayoutPlan } from "./layout.js";
 import { getConfig, readKVFile } from "./config.js";
@@ -19,19 +19,11 @@ export interface CLIOverrides {
 
 function configureTmuxTitle(): void {
   try {
-    tmux(`set-option -g set-titles on`);
-    tmux(`set-option -g set-titles-string ${shellWord("#{s/^tp-//:session_name}")}`);
+    tmux(["set-option", "-g", "set-titles", "on"]);
+    tmux(["set-option", "-g", "set-titles-string", "#{s/^tp-//:session_name}"]);
   } catch {
     // Non-critical — continue if title config fails
   }
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
-}
-
-function shellWord(value: string): string {
-  return /^[A-Za-z0-9_./:-]+$/.test(value) ? value : shellQuote(value);
 }
 
 function commandName(command: string): string {
@@ -40,8 +32,9 @@ function commandName(command: string): string {
   return match?.[1] ?? match?.[2] ?? match?.[3] ?? "";
 }
 
-function tmux(cmd: string): string {
-  return execSync(`tmux ${cmd}`, { encoding: "utf-8" }).trim();
+function tmux(args: string[], options?: { stdio: "ignore" | "inherit" }): string {
+  const output = execFileSync("tmux", args, options ?? { encoding: "utf-8" });
+  return typeof output === "string" ? output.trim() : "";
 }
 
 function splitPane(
@@ -51,17 +44,28 @@ function splitPane(
   cwd: string,
   command?: string,
 ): string {
-  const cmdPart = command ? ` ${shellWord(`${command}; exec $SHELL`)}` : "";
-  return tmux(
-    `split-window -${dir} -t ${shellWord(targetId)} -l ${size}% -c ${shellWord(cwd)} -P -F ${shellWord("#{pane_id}")}${cmdPart}`,
-  );
+  const args = [
+    "split-window",
+    `-${dir}`,
+    "-t",
+    targetId,
+    "-l",
+    `${size}%`,
+    "-c",
+    cwd,
+    "-P",
+    "-F",
+    "#{pane_id}",
+  ];
+  if (command) args.push(`${command}; exec $SHELL`);
+  return tmux(args);
 }
 
 function isCommandInstalled(cmd: string): boolean {
   const binary = commandName(cmd);
   if (!binary) return true;
   try {
-    execSync(`command -v ${shellWord(binary)}`, { stdio: "ignore" });
+    execFileSync("which", [binary], { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -98,12 +102,7 @@ const KNOWN_INSTALL_COMMANDS: Record<string, () => string | null> = {
         ["pacman", "sudo pacman -S --noconfirm tmux"],
       ];
       for (const [bin, cmd] of managers) {
-        try {
-          execSync(`command -v ${bin}`, { stdio: "ignore" });
-          return cmd;
-        } catch {
-          // try next
-        }
+        if (isCommandInstalled(bin)) return cmd;
       }
     }
     return null;
@@ -213,7 +212,7 @@ export function resolveConfig(targetDir: string, cliOverrides: CLIOverrides): Re
 
 function configureMouseMode(sessionName: string, mouse: boolean): void {
   try {
-    tmux(`set-option -t ${shellWord(sessionName)} mouse ${mouse ? "on" : "off"}`);
+    tmux(["set-option", "-t", sessionName, "mouse", mouse ? "on" : "off"]);
   } catch {
     // Non-critical — continue if mouse config fails
   }
@@ -221,8 +220,8 @@ function configureMouseMode(sessionName: string, mouse: boolean): void {
 
 function buildSession(sessionName: string, targetDir: string, plan: LayoutPlan, mouse: boolean): void {
   // Create detached session and capture the root pane ID
-  tmux(`new-session -d -s ${shellWord(sessionName)} -c ${shellWord(targetDir)}`);
-  const rootId = tmux(`display -t ${shellWord(`${sessionName}:0`)} -p ${shellWord("#{pane_id}")}`);
+  tmux(["new-session", "-d", "-s", sessionName, "-c", targetDir]);
+  const rootId = tmux(["display", "-t", `${sessionName}:0`, "-p", "#{pane_id}"]);
 
   // Enable/disable mouse mode for this session
   configureMouseMode(sessionName, mouse);
@@ -267,11 +266,11 @@ function buildSession(sessionName: string, targetDir: string, plan: LayoutPlan, 
 
   // Root pane was created with a plain shell — replace it with the editor
   if (plan.editor) {
-    tmux(`respawn-pane -k -t ${shellWord(rootId)} -c ${shellWord(targetDir)} ${shellWord(`${plan.editor}; exec $SHELL`)}`);
+    tmux(["respawn-pane", "-k", "-t", rootId, "-c", targetDir, `${plan.editor}; exec $SHELL`]);
   }
 
   // Focus the first editor pane
-  tmux(`select-pane -t ${shellWord(rootId)}`);
+  tmux(["select-pane", "-t", rootId]);
 }
 
 export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Promise<void> {
@@ -299,14 +298,14 @@ export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Pr
 
   // If session already exists, kill it with --force or re-attach
   try {
-    execSync(`tmux has-session -t ${shellWord(sessionName)}`, { stdio: "ignore" });
+    tmux(["has-session", "-t", sessionName], { stdio: "ignore" });
     if (cliOverrides?.force) {
-      execSync(`tmux kill-session -t ${shellWord(sessionName)}`, { stdio: "ignore" });
+      tmux(["kill-session", "-t", sessionName], { stdio: "ignore" });
     } else {
       console.log(`Attaching to existing session: ${sessionName}`);
       configureMouseMode(sessionName, mouse);
       configureTmuxTitle();
-      execSync(`tmux attach-session -t ${shellWord(sessionName)}`, { stdio: "inherit" });
+      tmux(["attach-session", "-t", sessionName], { stdio: "inherit" });
       return;
     }
   } catch {
@@ -317,7 +316,7 @@ export async function launch(targetDir: string, cliOverrides?: CLIOverrides): Pr
 
   try {
     configureTmuxTitle();
-    execSync(`tmux attach-session -t ${shellWord(sessionName)}`, { stdio: "inherit" });
+    tmux(["attach-session", "-t", sessionName], { stdio: "inherit" });
   } catch {
     // tmux exited (user detached / closed) — that's fine
   }
