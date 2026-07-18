@@ -63,8 +63,8 @@
     "husky": "^9.1.7",
     "tsup": "^8.0.0",
     "typescript": "^6.0.2",
-    "typescript-eslint": "^8.58.2",
-    "vite": "^8.0.16",
+    "typescript-eslint": "^8.64.0",
+    "vite": "^8.1.4",
     "vitest": "^4.1.0"
   }
 }
