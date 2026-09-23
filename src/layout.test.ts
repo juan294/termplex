@@ -6,7 +6,7 @@ describe("planLayout", () => {
     const plan = planLayout();
     expect(plan.editor).toBe("claude");
     expect(plan.sidebarCommand).toBe("lazygit");
-    expect(plan.editorSize).toBe(75);
+    expect(plan.editorSize).toBe(76);
     expect(plan.sidebarSize).toBe(25);
   });
 
