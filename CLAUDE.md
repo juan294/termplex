@@ -114,3 +114,6 @@ Go directly to these paths -- never search for them.
 | Research | `docs/research/YYYY-MM-DD-*.md` | |
 | Plans | `docs/plans/YYYY-MM-DD-*.md` | `-phases/` |
 | ADRs | `docs/decisions/` | |
+<!-- rpi:claude-import:start -->
+@AGENTS.md
+<!-- rpi:claude-import:end -->
